@@ -6,12 +6,9 @@ public class Main
 {
     public static void main(String[] args)
     {
-        Frame awtFrame = new Frame("Просто окно Jast");
+        Guitest guitest = new Guitest();
+        guitest.Gui();
 
-        Label labelFrame = new Label("Перывый текст");
 
-        awtFrame.add(labelFrame);
-        awtFrame.setSize(300,200);
-        awtFrame.setVisible(true);
     }
 }
