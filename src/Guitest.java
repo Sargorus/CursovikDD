@@ -8,8 +8,10 @@ public class Guitest {
         Label labelFrame = new Label("Перывый текст");
 
         awtFrame.add(labelFrame);
-        awtFrame.setSize(300, 200);
+        awtFrame.setSize(500, 600);
         awtFrame.setVisible(true);
+
+        
     }
 
 }

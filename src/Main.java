@@ -9,6 +9,8 @@ public class Main
         Guitest guitest = new Guitest();
         guitest.Gui();
 
+        System.out.printf("Конец создания окон");
+
 
     }
 }
