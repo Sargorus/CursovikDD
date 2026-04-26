@@ -1,6 +1,7 @@
 package controller;
 
 import view.EntryWindow;
+import view.MainWindow;
 import model.UserDAO;
 
 public class LoginController {
@@ -30,7 +31,7 @@ public class LoginController {
                 window.showSuccess("Добро пожаловать, " + login + "!");
                 window.clearFields();
 
-                openMainWindow();
+                openMainWindow(login);
             } else {
                 window.showError("Неверный логин или пароль!");
                 window.clearFields();
@@ -38,7 +39,9 @@ public class LoginController {
         }
     }
 
-    private void openMainWindow() {
+    private void openMainWindow(String username) {
         window.close();
+        MainWindow mainWindow = new MainWindow(username);
+        new MainWindowController(mainWindow, username);
     }
 }

@@ -7,7 +7,7 @@ public class UserDAO {
     private static List<User> users = new ArrayList<>();
 
     static {
-        users.add(new User("admin", "admin123"));
+        users.add(new User("a", "a"));
         users.add(new User("user", "user123"));
     }
 
@@ -23,10 +23,10 @@ public class UserDAO {
 
     // Добавление нового пользователя
     public static boolean addUser(String login, String password) {
-        // Проверяем, не существует ли уже такой логин
+        // Проверка, не существует ли уже такой логин
         for (User user : users) {
             if (user.getLogin().equals(login)) {
-                return false; // Пользователь уже существует
+                return false;
             }
         }
         users.add(new User(login, password));
