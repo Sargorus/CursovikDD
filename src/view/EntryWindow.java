@@ -6,6 +6,7 @@ import java.awt.event.FocusEvent;
 
 public class EntryWindow extends JFrame {
     private JLabel helloWindow=new JLabel("Добро пожаловать", SwingConstants.CENTER);
+
     private JTextField newLogin=new JTextField("Введите логин");
     private JPasswordField newPassword=new JPasswordField("Введите пароль");
     private JButton entryButton=new JButton("Войти");
@@ -23,6 +24,14 @@ public class EntryWindow extends JFrame {
 
     public JButton getEntryButton() {
         return entryButton;
+    }
+
+    public String getLoginHint() {
+        return loginHint;
+    }
+
+    public String getPasswordHint() {
+        return passwordHint;
     }
 
     public EntryWindow(String s){
@@ -48,6 +57,16 @@ public class EntryWindow extends JFrame {
         newPassword.setEchoChar((char) 0);
 
         addFocusListeners();
+
+    }
+
+
+    public void showError(String message) {
+        JOptionPane.showMessageDialog(this, message, "Ошибка", JOptionPane.ERROR_MESSAGE);
+    }
+
+    public void showSuccess(String message) {
+        JOptionPane.showMessageDialog(this, message, "Успех", JOptionPane.INFORMATION_MESSAGE);
     }
 
     private void addFocusListeners() {
@@ -95,5 +114,9 @@ public class EntryWindow extends JFrame {
         newLogin.setText(loginHint);
         newPassword.setText(passwordHint);
         newPassword.setEchoChar((char) 0);
+    }
+
+    public void close() {
+        this.dispose();
     }
 }
