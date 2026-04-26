@@ -1,6 +1,5 @@
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-import model.Test;
 import model.UserDAO;
 import view.EntryWindow;
 
@@ -19,7 +18,7 @@ public class Main
             String password = new String(window.getNewPassword().getPassword());
 
             // Проверка, реальные ли данные вводит пользователь
-            if (login.equals("Введите логиг") || login.trim().isEmpty()){
+            if (login.equals("Введите логин") || login.trim().isEmpty()){
                 JOptionPane.showMessageDialog(window,
                         "Пожалуйста, введите логин!",
                         "Ошибка",
