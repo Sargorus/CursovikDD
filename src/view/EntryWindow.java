@@ -90,4 +90,10 @@ public class EntryWindow extends JFrame {
             }
         });
     }
+
+    public void clearFields() {
+        newLogin.setText(loginHint);
+        newPassword.setText(passwordHint);
+        newPassword.setEchoChar((char) 0);
+    }
 }
