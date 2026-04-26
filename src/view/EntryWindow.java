@@ -5,7 +5,7 @@ import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 
 public class EntryWindow extends JFrame {
-    private JLabel helloWindow=new JLabel("Добро пожаловать", SwingConstants.CENTER);
+    private JLabel welcomeWindow =new JLabel("Добро пожаловать", SwingConstants.CENTER);
 
     private JTextField newLogin=new JTextField("Введите логин");
     private JPasswordField newPassword=new JPasswordField("Введите пароль");
@@ -39,14 +39,15 @@ public class EntryWindow extends JFrame {
         setSize(300,300);
         setVisible(true);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null); //центр экрана
         setLayout(new GridLayout(4,1));
-        add(helloWindow);
+        add(welcomeWindow);
         add(newLogin);
         add(newPassword);
         add(entryButton);
 
-        helloWindow.setFont(new Font("Arial", Font.BOLD, 15));
-        helloWindow.setForeground(new Color(75, 0, 130));
+        welcomeWindow.setFont(new Font("Arial", Font.BOLD, 15));
+        welcomeWindow.setForeground(new Color(75, 0, 130));
 
         newLogin.setFont(new Font("Arial", Font.BOLD, 10));
         newLogin.setForeground(new Color(75, 0, 130));
