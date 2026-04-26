@@ -35,6 +35,11 @@ public class Main
                             "Добро пожаловать, " + login + "!",
                             "Успешный вход",
                             JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(window,
+                            "Неверный логин или пароль!\nПопробуйте снова.",
+                            "Ошибка авторизации",
+                            JOptionPane.ERROR_MESSAGE);
                     window.clearFields();
                 }
             }
