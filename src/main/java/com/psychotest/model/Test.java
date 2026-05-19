@@ -1,4 +1,4 @@
-package model;
+package main.java.com.psychotest.model;
 
 import java.util.List;
 
