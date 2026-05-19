@@ -1,16 +1,13 @@
 package main.java.com.psychotest.view;
 
-import main.java.com.psychotest.view.panels.AvailableTestsPanel;
+import main.java.com.psychotest.view.panels.*;
 import main.java.com.psychotest.controller.TakerController;
 import main.java.com.psychotest.model.User;
-import main.java.com.psychotest.view.panels.GroupsPanel;
-import main.java.com.psychotest.view.panels.ResultsViewPanel;
-import main.java.com.psychotest.view.panels.UsersPanel;
+
 import javax.swing.*;
 import java.awt.*;
 import main.java.com.psychotest.controller.AdminController;
 import main.java.com.psychotest.controller.TeacherController;
-import main.java.com.psychotest.view.panels.MyTestsPanel;
 
 public class MainWindow extends JFrame {
     private User currentUser;
@@ -210,8 +207,8 @@ public class MainWindow extends JFrame {
         tabbedPane.addTab("📋 Доступные тесты", availableTestsPanel);
 
         // Панель "Мои результаты" (позже)
-        // MyResultsPanel myResultsPanel = new MyResultsPanel(takerController);
-        // tabbedPane.addTab("📊 Мои результаты", myResultsPanel);
+        MyResultsPanel myResultsPanel = new MyResultsPanel(takerController);
+        tabbedPane.addTab("📊 Мои результаты", myResultsPanel);
 
         contentPanel.add(tabbedPane, BorderLayout.CENTER);
         contentPanel.revalidate();
