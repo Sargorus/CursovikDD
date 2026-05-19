@@ -2,6 +2,7 @@ package main.java.com.psychotest.view;
 
 import main.java.com.psychotest.model.User;
 import main.java.com.psychotest.view.panels.GroupsPanel;
+import main.java.com.psychotest.view.panels.ResultsViewPanel;
 import main.java.com.psychotest.view.panels.UsersPanel;
 import javax.swing.*;
 import java.awt.*;
@@ -173,7 +174,7 @@ public class MainWindow extends JFrame {
         }
     }
 
-    // Добавьте метод для отображения панелей преподавателя
+    // Метод для отображения панелей преподавателя
     private void setupTeacherPanels() {
         contentPanel.removeAll();
 
@@ -183,12 +184,11 @@ public class MainWindow extends JFrame {
         MyTestsPanel myTestsPanel = new MyTestsPanel(teacherController);
         tabbedPane.addTab("📋 Мои тесты", myTestsPanel);
 
-        // Панель "Назначения" (позже)
-        // tabbedPane.addTab("📌 Назначения", assignmentsPanel);
+        // Панель "Результаты"
+        ResultsViewPanel resultsPanel = new ResultsViewPanel(teacherController);
+        tabbedPane.addTab("📊 Результаты", resultsPanel);
 
-        // Панель "Результаты" (позже)
-        // tabbedPane.addTab("📊 Результаты", resultsPanel);
-
+        // Панель "Назначения" (опционально, позже)
         contentPanel.add(tabbedPane, BorderLayout.CENTER);
         contentPanel.revalidate();
         contentPanel.repaint();
