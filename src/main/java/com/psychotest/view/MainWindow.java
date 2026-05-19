@@ -1,5 +1,7 @@
 package main.java.com.psychotest.view;
 
+import main.java.com.psychotest.view.panels.AvailableTestsPanel;
+import main.java.com.psychotest.controller.TakerController;
 import main.java.com.psychotest.model.User;
 import main.java.com.psychotest.view.panels.GroupsPanel;
 import main.java.com.psychotest.view.panels.ResultsViewPanel;
@@ -20,6 +22,7 @@ public class MainWindow extends JFrame {
     private JPanel contentPanel;
     private JTabbedPane tabbedPane;
     private TeacherController teacherController;
+    private TakerController takerController;
 
     public MainWindow(User user) {
         this.currentUser = user;
@@ -34,6 +37,9 @@ public class MainWindow extends JFrame {
         } else if (currentUser.getRole().equals("TEACHER")) {
             this.teacherController = new TeacherController(currentUser.getId());
             setupTeacherPanels();
+        } else if (currentUser.getRole().equals("TAKER")) {
+            this.takerController = new TakerController(currentUser.getId());
+            setupTakerPanels();
         }
     }
 
@@ -189,6 +195,24 @@ public class MainWindow extends JFrame {
         tabbedPane.addTab("📊 Результаты", resultsPanel);
 
         // Панель "Назначения" (опционально, позже)
+        contentPanel.add(tabbedPane, BorderLayout.CENTER);
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
+    private void setupTakerPanels() {
+        contentPanel.removeAll();
+
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        // Панель "Доступные тесты"
+        AvailableTestsPanel availableTestsPanel = new AvailableTestsPanel(takerController);
+        tabbedPane.addTab("📋 Доступные тесты", availableTestsPanel);
+
+        // Панель "Мои результаты" (позже)
+        // MyResultsPanel myResultsPanel = new MyResultsPanel(takerController);
+        // tabbedPane.addTab("📊 Мои результаты", myResultsPanel);
+
         contentPanel.add(tabbedPane, BorderLayout.CENTER);
         contentPanel.revalidate();
         contentPanel.repaint();
