@@ -210,4 +210,22 @@ public class ResultService {
         public List<AnswerDetail> getAnswers() { return answers; }
         public void setAnswers(List<AnswerDetail> answers) { this.answers = answers; }
     }
+
+    /**
+     * Получить название теста по ID сессии
+     */
+    public String getTestNameBySessionId(int sessionId) throws SQLException {
+        String sql = "SELECT t.name FROM tests t " +
+                "JOIN test_sessions ts ON t.id = ts.test_id " +
+                "WHERE ts.id = ?";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, sessionId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("name");
+            }
+        }
+        return "Неизвестный тест";
+    }
 }
