@@ -9,6 +9,8 @@ import main.java.com.psychotest.model.Group;
 import main.java.com.psychotest.model.TestState;
 import main.java.com.psychotest.service.TestPersistenceService;
 import main.java.com.psychotest.service.ResultService;
+import main.java.com.psychotest.service.ExcelReportService;
+import main.java.com.psychotest.util.DatabaseConnection;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -22,6 +24,7 @@ public class TeacherController {
     private TestPersistenceService persistenceService;
     private int teacherId;
     private ResultService resultService;
+    private ExcelReportService excelService;
 
     public TeacherController(int teacherId) {
         this.teacherId = teacherId;
@@ -30,6 +33,7 @@ public class TeacherController {
         this.groupDAO = new GroupDAO();
         this.persistenceService = new TestPersistenceService();
         this.resultService = new ResultService();
+        this.excelService = new ExcelReportService();
     }
 
     // ========== Управление тестами ==========
@@ -226,5 +230,61 @@ public class TeacherController {
 
     public int getTeacherId() {
         return teacherId;
+    }
+
+    // ========== Экспорт в Excel ==========
+
+    /**
+     * Экспортирует результаты теста в Excel
+     */
+    public boolean exportTestResultsToExcel(int testId, String filePath) {
+        Test test = getTestById(testId);
+        if (test == null) {
+            return false;
+        }
+
+        List<ResultService.TestResult> results = getResultsForTest(testId);
+        return excelService.exportResultsToExcel(results, test, filePath);
+    }
+
+    /**
+     * Экспортирует детальные результаты сессии в Excel
+     */
+    public boolean exportSessionDetailsToExcel(int sessionId, String filePath) {
+        ResultService.SessionDetail detail = getSessionDetail(sessionId);
+        if (detail == null) {
+            return false;
+        }
+
+        String userName = "";
+        String testName = getTestNameBySessionId(sessionId);
+
+        // Получаем имя пользователя
+        for (ResultService.TestResult result : getResultsForTest(getTestIdBySessionId(sessionId))) {
+            if (result.getSessionId() == sessionId) {
+                userName = result.getUserFullName();
+                break;
+            }
+        }
+
+        return excelService.exportSessionDetailsToExcel(detail, userName, testName, filePath);
+    }
+
+    // Вспомогательный метод
+    private int getTestIdBySessionId(int sessionId) {
+        try {
+            String sql = "SELECT test_id FROM test_sessions WHERE id = ?";
+            try (java.sql.Connection conn = DatabaseConnection.getInstance().getConnection();
+                 java.sql.PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setInt(1, sessionId);
+                java.sql.ResultSet rs = pstmt.executeQuery();
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (java.sql.SQLException e) {
+            e.printStackTrace();
+        }
+        return -1;
     }
 }

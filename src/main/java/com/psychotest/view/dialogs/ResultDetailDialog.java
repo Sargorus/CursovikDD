@@ -41,12 +41,42 @@ public class ResultDetailDialog extends JDialog {
 
         add(tabbedPane, BorderLayout.CENTER);
 
-        // Кнопка закрытия
+        // Нижняя панель с кнопками
         JPanel buttonPanel = new JPanel(new FlowLayout());
+
+        JButton exportButton = new JButton("📊 Экспорт в Excel");
+        exportButton.addActionListener(e -> exportToExcel());
+
         JButton closeButton = new JButton("Закрыть");
         closeButton.addActionListener(e -> dispose());
+
+        buttonPanel.add(exportButton);
         buttonPanel.add(closeButton);
         add(buttonPanel, BorderLayout.SOUTH);
+
+    }
+
+    private void exportToExcel() {
+        JFileChooser fileChooser = new JFileChooser();
+        String defaultFileName = "result_" + userName + "_" +
+                java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+        fileChooser.setSelectedFile(new java.io.File(defaultFileName));
+        fileChooser.setDialogTitle("Сохранить отчёт как...");
+
+        if (fileChooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        String filePath = fileChooser.getSelectedFile().getAbsolutePath();
+        if (!filePath.endsWith(".xlsx")) {
+            filePath += ".xlsx";
+        }
+
+        // TODO: Вызвать экспорт через контроллер
+        JOptionPane.showMessageDialog(this,
+                "Экспорт детального отчёта будет реализован в следующей версии.\n" +
+                        "Пока что используйте экспорт из главного окна.",
+                "Информация", JOptionPane.INFORMATION_MESSAGE);
     }
 
     private JPanel createParametersPanel() {
