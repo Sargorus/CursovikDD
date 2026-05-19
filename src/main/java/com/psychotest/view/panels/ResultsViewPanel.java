@@ -4,6 +4,7 @@ import main.java.com.psychotest.controller.TeacherController;
 import main.java.com.psychotest.model.Test;
 import main.java.com.psychotest.model.User;
 import main.java.com.psychotest.service.ResultService;
+import main.java.com.psychotest.view.dialogs.ResultDetailDialog;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -143,17 +144,44 @@ public class ResultsViewPanel extends JPanel {
         int sessionId = (int) tableModel.getValueAt(selectedRow, 0);
         String userName = (String) tableModel.getValueAt(selectedRow, 1);
 
-        ResultService.SessionDetail detail = controller.getSessionDetail(sessionId);
-        if (detail != null) {
-            // TODO: Показать детали в отдельном диалоге
-            JOptionPane.showMessageDialog(this,
-                    "Детальный просмотр для " + userName + "\n" +
-                            "Параметров: " + (detail.getParameterResults() != null ? detail.getParameterResults().size() : 0) + "\n" +
-                            "Ответов: " + (detail.getAnswers() != null ? detail.getAnswers().size() : 0),
-                    "Информация", JOptionPane.INFORMATION_MESSAGE);
-        } else {
-            JOptionPane.showMessageDialog(this, "Не удалось загрузить детали результата!");
-        }
+        Test selectedTest = (Test) testCombo.getSelectedItem();
+        String testName = selectedTest != null ? selectedTest.getName() : "Тест";
+
+        // Показываем индикатор загрузки
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+
+        // Загружаем детали в отдельном потоке
+        SwingWorker<ResultService.SessionDetail, Void> worker = new SwingWorker<>() {
+            @Override
+            protected ResultService.SessionDetail doInBackground() {
+                return controller.getSessionDetail(sessionId);
+            }
+
+            @Override
+            protected void done() {
+                setCursor(Cursor.getDefaultCursor());
+                try {
+                    ResultService.SessionDetail detail = get();
+                    if (detail != null) {
+                        ResultDetailDialog dialog = new ResultDetailDialog(
+                                SwingUtilities.getWindowAncestor(ResultsViewPanel.this),
+                                detail, userName, testName
+                        );
+                        dialog.setVisible(true);
+                    } else {
+                        JOptionPane.showMessageDialog(ResultsViewPanel.this,
+                                "Не удалось загрузить детали результата!",
+                                "Ошибка", JOptionPane.ERROR_MESSAGE);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    JOptionPane.showMessageDialog(ResultsViewPanel.this,
+                            "Ошибка при загрузке деталей: " + e.getMessage(),
+                            "Ошибка", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        };
+        worker.execute();
     }
 
     private void exportToExcel() {

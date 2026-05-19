@@ -212,6 +212,18 @@ public class TeacherController {
         }
     }
 
+    /**
+     * Получить название теста по ID сессии
+     */
+    public String getTestNameBySessionId(int sessionId) {
+        try {
+            return resultService.getTestNameBySessionId(sessionId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "Неизвестный тест";
+        }
+    }
+
     public int getTeacherId() {
         return teacherId;
     }
