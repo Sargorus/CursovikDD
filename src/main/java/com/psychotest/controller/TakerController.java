@@ -5,10 +5,17 @@ import main.java.com.psychotest.dao.TestSessionDAO;
 import main.java.com.psychotest.dao.UserDAO;
 import main.java.com.psychotest.model.*;
 import main.java.com.psychotest.service.ResultCalculationService;
+import main.java.com.psychotest.util.DatabaseConnection;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 
 public class TakerController {
     private int userId;
@@ -183,5 +190,24 @@ public class TakerController {
             e.printStackTrace();
             return "Тест #" + testId;
         }
+    }
+
+    /**
+     * Получить сохранённые ответы для сессии
+     */
+    public Map<Integer, Integer> getSavedAnswers(int sessionId) {
+        Map<Integer, Integer> answers = new HashMap<>();
+        String sql = "SELECT question_id, answer_option_id FROM user_answers WHERE session_id = ?";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, sessionId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                answers.put(rs.getInt("question_id"), rs.getInt("answer_option_id"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return answers;
     }
 }
