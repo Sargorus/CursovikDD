@@ -191,10 +191,72 @@ public class ResultsViewPanel extends JPanel {
             return;
         }
 
-        // TODO: Экспорт в Excel
-        JOptionPane.showMessageDialog(this,
-                "Экспорт в Excel будет реализован в следующей версии.",
-                "Информация", JOptionPane.INFORMATION_MESSAGE);
+        int option = JOptionPane.showOptionDialog(this,
+                "Что вы хотите экспортировать?",
+                "Экспорт в Excel",
+                JOptionPane.YES_NO_CANCEL_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                new String[]{"Все результаты теста", "Только выбранный результат", "Отмена"},
+                "Все результаты теста");
+
+        if (option == 2 || option == JOptionPane.CLOSED_OPTION) {
+            return;
+        }
+
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setSelectedFile(new java.io.File("report.xlsx"));
+        fileChooser.setDialogTitle("Сохранить отчёт как...");
+
+        if (fileChooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        // ВСЕ ДАННЫЕ ДЛЯ ЭКСПОРТА СОБИРАЕМ ДО ЗАПУСКА SWINGWORKER
+        String basePath = fileChooser.getSelectedFile().getAbsolutePath();
+        String finalPath = basePath.endsWith(".xlsx") ? basePath : basePath + ".xlsx";
+        int sessionId = (int) tableModel.getValueAt(selectedRow, 0);
+        Test selectedTest = (Test) testCombo.getSelectedItem();
+        int exportOption = option; // сохраняем option в final переменную
+
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+
+        SwingWorker<Boolean, Void> worker = new SwingWorker<Boolean, Void>() {
+            @Override
+            protected Boolean doInBackground() throws Exception {
+                if (exportOption == 0) {
+                    if (selectedTest == null) {
+                        return false;
+                    }
+                    return controller.exportTestResultsToExcel(selectedTest.getId(), finalPath);
+                } else {
+                    return controller.exportSessionDetailsToExcel(sessionId, finalPath);
+                }
+            }
+
+            @Override
+            protected void done() {
+                setCursor(Cursor.getDefaultCursor());
+                try {
+                    boolean success = get();
+                    if (success) {
+                        JOptionPane.showMessageDialog(ResultsViewPanel.this,
+                                "Отчёт успешно сохранён!\n" + finalPath,
+                                "Успех", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(ResultsViewPanel.this,
+                                "Ошибка при создании отчёта!",
+                                "Ошибка", JOptionPane.ERROR_MESSAGE);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    JOptionPane.showMessageDialog(ResultsViewPanel.this,
+                            "Ошибка: " + e.getMessage(),
+                            "Ошибка", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        };
+        worker.execute();
     }
 
 
