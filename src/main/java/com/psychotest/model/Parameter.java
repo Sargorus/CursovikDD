@@ -1,9 +1,11 @@
 package main.java.com.psychotest.model;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Parameter {
+public class Parameter implements Serializable {
+    private static final long serialVersionUID = 1L;
     private int id;
     private int testId;
     private String name;

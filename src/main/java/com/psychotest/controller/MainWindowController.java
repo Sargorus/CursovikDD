@@ -88,11 +88,9 @@ public class MainWindowController {
     }
 
     private void createTest() {
-        // TODO: Открыть конструктор тестов
-        JOptionPane.showMessageDialog(window,
-                "Конструктор тестов будет реализован в следующей версии",
-                "В разработке",
-                JOptionPane.INFORMATION_MESSAGE);
+        main.java.com.psychotest.view.dialogs.TestConstructorDialog dialog =
+                new main.java.com.psychotest.view.dialogs.TestConstructorDialog(window, currentUser.getId());
+        dialog.setVisible(true);
     }
 
     private void viewMyTests() {
