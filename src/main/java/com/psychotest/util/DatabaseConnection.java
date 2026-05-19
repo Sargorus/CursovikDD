@@ -14,9 +14,9 @@ public class DatabaseConnection {
 
     private DatabaseConnection() {
         // Для тестирования можно использовать переменные окружения или properties
-        this.url = System.getProperty("DB_URL", "jdbc:postgresql://localhost:5433/psychotest_db");
+        this.url = System.getProperty("DB_URL", "jdbc:postgresql://localhost:5432/psychotest_db");
         this.username = System.getProperty("DB_USER", "postgres");
-        this.password = System.getProperty("DB_PASSWORD", "VAS195");
+        this.password = System.getProperty("DB_PASSWORD", "123");
 
         try {
             Class.forName("org.postgresql.Driver");
