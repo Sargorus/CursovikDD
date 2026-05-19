@@ -9,12 +9,12 @@ import java.awt.*;
 public class MainWindow extends JFrame {
     private User currentUser;
     private JMenuBar menuBar;
-    private JMenu fileMenu, testMenu, userMenu, reportMenu;
-    private JMenuItem exitItem, createTestItem, myTestsItem, assignTestItem,
+    private JMenu fileMenu, testMenu, userMenu, reportMenu, accountMenu;
+    private JMenuItem exitItem, logoutItem, createTestItem, myTestsItem, assignTestItem,
             viewResultsItem, manageUsersItem, manageGroupsItem;
     private JLabel welcomeLabel;
     private JPanel contentPanel;
-    private JTabbedPane tabbedPane; // Добавляем TabbedPane как поле
+    private JTabbedPane tabbedPane;
 
     public MainWindow(User user) {
         this.currentUser = user;
@@ -22,10 +22,8 @@ public class MainWindow extends JFrame {
         setupLayout();
         setupMenu();
 
-        // Инициализируем TabbedPane
         tabbedPane = new JTabbedPane();
 
-        // Для администратора сразу показываем вкладки
         if (currentUser.getRole().equals("ADMIN")) {
             setupAdminPanels();
         }
@@ -54,10 +52,17 @@ public class MainWindow extends JFrame {
 
         // Файл меню
         fileMenu = new JMenu("Файл");
-        exitItem = new JMenuItem("Выход");
-        exitItem.addActionListener(e -> System.exit(0));
+        exitItem = new JMenuItem("Выход из приложения");
+        exitItem.addActionListener(e -> exitApplication());
         fileMenu.add(exitItem);
         menuBar.add(fileMenu);
+
+        // Аккаунт меню (для выхода из профиля)
+        accountMenu = new JMenu("Аккаунт");
+        logoutItem = new JMenuItem("Выйти из профиля");
+        logoutItem.addActionListener(e -> logout());
+        accountMenu.add(logoutItem);
+        menuBar.add(accountMenu);
 
         // В зависимости от роли добавляем разные меню
         switch (currentUser.getRole()) {
@@ -110,29 +115,52 @@ public class MainWindow extends JFrame {
     }
 
     private void setupAdminPanels() {
-        // Очищаем контент панель
         contentPanel.removeAll();
-
-        // Создаём новый TabbedPane
         tabbedPane = new JTabbedPane();
 
-        // Вкладка пользователей
         UsersPanel usersPanel = new UsersPanel();
         tabbedPane.addTab("👥 Пользователи", usersPanel);
 
-        // Вкладка групп
         GroupsPanel groupsPanel = new GroupsPanel();
         tabbedPane.addTab("📁 Группы", groupsPanel);
 
-        // Добавляем TabbedPane в contentPanel
         contentPanel.add(tabbedPane, BorderLayout.CENTER);
-
-        // Обновляем отображение
         contentPanel.revalidate();
         contentPanel.repaint();
     }
 
-    // Альтернативный метод для установки любого JComponent
+    // Выход из профиля (возврат на окно входа)
+    private void logout() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Вы уверены, что хотите выйти из профиля?",
+                "Подтверждение выхода",
+                JOptionPane.YES_NO_OPTION);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            this.dispose(); // Закрываем главное окно
+
+            // Открываем окно входа заново
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                main.java.com.psychotest.view.EntryWindow entryWindow =
+                        new main.java.com.psychotest.view.EntryWindow();
+                new main.java.com.psychotest.controller.LoginController(entryWindow);
+                entryWindow.setVisible(true);
+            });
+        }
+    }
+
+    // Полный выход из приложения
+    private void exitApplication() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Вы уверены, что хотите выйти из приложения?",
+                "Подтверждение выхода",
+                JOptionPane.YES_NO_OPTION);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            System.exit(0);
+        }
+    }
+
     public void setContentComponent(Component component) {
         contentPanel.removeAll();
         contentPanel.add(component, BorderLayout.CENTER);
@@ -140,11 +168,12 @@ public class MainWindow extends JFrame {
         contentPanel.repaint();
     }
 
-    // Геттеры для контроллера
+    // Геттеры
     public User getCurrentUser() { return currentUser; }
     public JPanel getContentPanel() { return contentPanel; }
 
     public JMenuItem getExitItem() { return exitItem; }
+    public JMenuItem getLogoutItem() { return logoutItem; }
     public JMenuItem getCreateTestItem() { return createTestItem; }
     public JMenuItem getMyTestsItem() { return myTestsItem; }
     public JMenuItem getAssignTestItem() { return assignTestItem; }

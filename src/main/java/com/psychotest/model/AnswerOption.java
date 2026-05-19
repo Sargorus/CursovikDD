@@ -1,9 +1,11 @@
 package main.java.com.psychotest.model;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-public class AnswerOption {
+public class AnswerOption implements Serializable {
+    private static final long serialVersionUID = 1L;
     private int id;
     private int questionId;
     private String text;

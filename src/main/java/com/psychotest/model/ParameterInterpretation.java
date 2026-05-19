@@ -1,6 +1,9 @@
 package main.java.com.psychotest.model;
 
-public class ParameterInterpretation {
+import java.io.Serializable;
+
+public class ParameterInterpretation implements Serializable {
+    private static final long serialVersionUID = 1L;
     private int id;
     private int parameterId;
     private Integer rangeStart;
