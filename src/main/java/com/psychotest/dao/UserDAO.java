@@ -136,4 +136,24 @@ public class UserDAO {
         }
         return user;
     }
+
+    // Получить пользователей по роли
+    public List<User> findByRole(String role) {
+        List<User> users = new ArrayList<>();
+        String sql = "SELECT * FROM users WHERE role = ? ORDER BY full_name";
+
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, role);
+            ResultSet rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                users.add(mapResultSetToUser(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return users;
+    }
 }

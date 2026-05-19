@@ -1,5 +1,8 @@
 package main.java.com.psychotest.view;
+
 import main.java.com.psychotest.model.User;
+import main.java.com.psychotest.view.panels.GroupsPanel;
+import main.java.com.psychotest.view.panels.UsersPanel;
 import javax.swing.*;
 import java.awt.*;
 
@@ -11,12 +14,21 @@ public class MainWindow extends JFrame {
             viewResultsItem, manageUsersItem, manageGroupsItem;
     private JLabel welcomeLabel;
     private JPanel contentPanel;
+    private JTabbedPane tabbedPane; // Добавляем TabbedPane как поле
 
     public MainWindow(User user) {
         this.currentUser = user;
         initComponents();
         setupLayout();
         setupMenu();
+
+        // Инициализируем TabbedPane
+        tabbedPane = new JTabbedPane();
+
+        // Для администратора сразу показываем вкладки
+        if (currentUser.getRole().equals("ADMIN")) {
+            setupAdminPanels();
+        }
     }
 
     private void initComponents() {
@@ -65,10 +77,9 @@ public class MainWindow extends JFrame {
 
     private void setupAdminMenu() {
         userMenu = new JMenu("Управление");
-        manageUsersItem = new JMenuItem("Управление пользователями");
-        manageGroupsItem = new JMenuItem("Управление группами");
+        manageUsersItem = new JMenuItem("Управление пользователями и группами");
+        manageUsersItem.addActionListener(e -> setupAdminPanels());
         userMenu.add(manageUsersItem);
-        userMenu.add(manageGroupsItem);
         menuBar.add(userMenu);
     }
 
@@ -96,6 +107,37 @@ public class MainWindow extends JFrame {
         testMenu.add(myTestsItem);
         testMenu.add(viewResultsItem);
         menuBar.add(testMenu);
+    }
+
+    private void setupAdminPanels() {
+        // Очищаем контент панель
+        contentPanel.removeAll();
+
+        // Создаём новый TabbedPane
+        tabbedPane = new JTabbedPane();
+
+        // Вкладка пользователей
+        UsersPanel usersPanel = new UsersPanel();
+        tabbedPane.addTab("👥 Пользователи", usersPanel);
+
+        // Вкладка групп
+        GroupsPanel groupsPanel = new GroupsPanel();
+        tabbedPane.addTab("📁 Группы", groupsPanel);
+
+        // Добавляем TabbedPane в contentPanel
+        contentPanel.add(tabbedPane, BorderLayout.CENTER);
+
+        // Обновляем отображение
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
+    // Альтернативный метод для установки любого JComponent
+    public void setContentComponent(Component component) {
+        contentPanel.removeAll();
+        contentPanel.add(component, BorderLayout.CENTER);
+        contentPanel.revalidate();
+        contentPanel.repaint();
     }
 
     // Геттеры для контроллера
