@@ -6,6 +6,8 @@ import main.java.com.psychotest.view.panels.UsersPanel;
 import javax.swing.*;
 import java.awt.*;
 import main.java.com.psychotest.controller.AdminController;
+import main.java.com.psychotest.controller.TeacherController;
+import main.java.com.psychotest.view.panels.MyTestsPanel;
 
 public class MainWindow extends JFrame {
     private User currentUser;
@@ -16,6 +18,7 @@ public class MainWindow extends JFrame {
     private JLabel welcomeLabel;
     private JPanel contentPanel;
     private JTabbedPane tabbedPane;
+    private TeacherController teacherController;
 
     public MainWindow(User user) {
         this.currentUser = user;
@@ -27,6 +30,9 @@ public class MainWindow extends JFrame {
 
         if (currentUser.getRole().equals("ADMIN")) {
             setupAdminPanels();
+        } else if (currentUser.getRole().equals("TEACHER")) {
+            this.teacherController = new TeacherController(currentUser.getId());
+            setupTeacherPanels();
         }
     }
 
@@ -167,6 +173,27 @@ public class MainWindow extends JFrame {
         }
     }
 
+    // Добавьте метод для отображения панелей преподавателя
+    private void setupTeacherPanels() {
+        contentPanel.removeAll();
+
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        // Панель "Мои тесты"
+        MyTestsPanel myTestsPanel = new MyTestsPanel(teacherController);
+        tabbedPane.addTab("📋 Мои тесты", myTestsPanel);
+
+        // Панель "Назначения" (позже)
+        // tabbedPane.addTab("📌 Назначения", assignmentsPanel);
+
+        // Панель "Результаты" (позже)
+        // tabbedPane.addTab("📊 Результаты", resultsPanel);
+
+        contentPanel.add(tabbedPane, BorderLayout.CENTER);
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
     public void setContentComponent(Component component) {
         contentPanel.removeAll();
         contentPanel.add(component, BorderLayout.CENTER);
@@ -193,4 +220,6 @@ public class MainWindow extends JFrame {
         contentPanel.revalidate();
         contentPanel.repaint();
     }
+
+
 }
