@@ -171,4 +171,17 @@ public class TakerController {
             return null;
         }
     }
+
+    /**
+     * Получить название теста по ID
+     */
+    public String getTestName(int testId) {
+        try {
+            Test test = testDAO.findById(testId);
+            return test != null ? test.getName() : "Тест #" + testId;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "Тест #" + testId;
+        }
+    }
 }
