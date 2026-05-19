@@ -4,7 +4,9 @@ import main.java.com.psychotest.controller.TakerController;
 import main.java.com.psychotest.model.*;
 import javax.swing.*;
 import java.awt.*;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class TestTakingDialog extends JDialog {
     private TakerController controller;
@@ -22,6 +24,9 @@ public class TestTakingDialog extends JDialog {
     private JButton prevButton;
     private JButton finishButton;
 
+    // Хранилище сохранённых ответов (questionId -> answerOptionId)
+    private Map<Integer, Integer> savedAnswers;
+
     public TestTakingDialog(Window parent, TakerController controller,
                             int sessionId, int testId, String testName) {
         super(parent, "Прохождение теста: " + testName, ModalityType.APPLICATION_MODAL);
@@ -29,14 +34,18 @@ public class TestTakingDialog extends JDialog {
         this.sessionId = sessionId;
         this.testId = testId;
         this.testName = testName;
+        this.savedAnswers = new HashMap<>();
 
         // Загружаем вопросы теста
         Test test = controller.getFullTest(testId);
-        if (test != null) {
+        if (test != null && test.getQuestionBank() != null) {
             this.questions = test.getQuestionBank();
         } else {
             this.questions = List.of();
         }
+
+        // Загружаем ранее сохранённые ответы из БД
+        loadSavedAnswers();
 
         initComponents();
         loadQuestion();
@@ -49,6 +58,14 @@ public class TestTakingDialog extends JDialog {
                 confirmAbandon();
             }
         });
+    }
+
+    /**
+     * Загружает ранее сохранённые ответы из базы данных через контроллер
+     */
+    private void loadSavedAnswers() {
+        savedAnswers = controller.getSavedAnswers(sessionId);
+        System.out.println("Загружено " + savedAnswers.size() + " сохранённых ответов для сессии " + sessionId);
     }
 
     private void initComponents() {
@@ -129,14 +146,23 @@ public class TestTakingDialog extends JDialog {
             if (i < options.size()) {
                 answerButtons[i].setText(options.get(i).getText());
                 answerButtons[i].setVisible(true);
-                // Восстанавливаем сохранённый ответ, если есть
-                // TODO: загрузить сохранённый ответ из БД
             } else {
                 answerButtons[i].setVisible(false);
             }
         }
 
-        answerGroup.clearSelection();
+        // Восстанавливаем сохранённый ответ, если есть
+        Integer savedAnswerId = savedAnswers.get(question.getId());
+        if (savedAnswerId != null) {
+            for (int i = 0; i < options.size(); i++) {
+                if (options.get(i).getId() == savedAnswerId) {
+                    answerButtons[i].setSelected(true);
+                    break;
+                }
+            }
+        } else {
+            answerGroup.clearSelection();
+        }
 
         // Обновляем прогресс
         progressBar.setValue(currentQuestionIndex);
@@ -144,15 +170,29 @@ public class TestTakingDialog extends JDialog {
 
         // Обновляем кнопки
         prevButton.setEnabled(currentQuestionIndex > 0);
-        nextButton.setEnabled(true);
-        finishButton.setEnabled(true);
+
+        // На последнем вопросе меняем текст кнопки "Далее" на "Завершить"
+        if (currentQuestionIndex == questions.size() - 1) {
+            nextButton.setText("✅ Завершить");
+        } else {
+            nextButton.setText("Далее ▶");
+        }
     }
 
     private void saveCurrentAnswer() {
+        if (questions.isEmpty() || currentQuestionIndex >= questions.size()) {
+            return;
+        }
+
         Question question = questions.get(currentQuestionIndex);
-        for (int i = 0; i < question.getAnswerOptions().size(); i++) {
+        List<AnswerOption> options = question.getAnswerOptions();
+
+        for (int i = 0; i < options.size(); i++) {
             if (answerButtons[i].isSelected()) {
-                int answerOptionId = question.getAnswerOptions().get(i).getId();
+                int answerOptionId = options.get(i).getId();
+                // Сохраняем в локальный кэш
+                savedAnswers.put(question.getId(), answerOptionId);
+                // Сохраняем в БД
                 controller.saveAnswer(sessionId, question.getId(), answerOptionId);
                 break;
             }
@@ -179,6 +219,7 @@ public class TestTakingDialog extends JDialog {
     }
 
     private void finishTest() {
+        // Сохраняем ответ на текущий вопрос, если он не был сохранён
         saveCurrentAnswer();
 
         int confirm = JOptionPane.showConfirmDialog(this,
@@ -202,12 +243,13 @@ public class TestTakingDialog extends JDialog {
                     setCursor(Cursor.getDefaultCursor());
                     try {
                         TestResult result = get();
-                        if (result != null) {
+                        if (result != null && result.isCompleted()) {
                             showResultDialog(result);
                             dispose();
                         } else {
+                            String errorMsg = result != null ? result.getErrorMessage() : "Неизвестная ошибка";
                             JOptionPane.showMessageDialog(TestTakingDialog.this,
-                                    "Ошибка при расчёте результатов!",
+                                    "Ошибка при расчёте результатов: " + errorMsg,
                                     "Ошибка", JOptionPane.ERROR_MESSAGE);
                             dispose();
                         }
@@ -227,23 +269,121 @@ public class TestTakingDialog extends JDialog {
     private void confirmAbandon() {
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Вы уверены, что хотите прервать тест?\n" +
-                        "Прогресс будет сохранён, но тест не будет засчитан.",
+                        "Прогресс будет сохранён, но тест не будет засчитан.\n\n" +
+                        "Вы сможете продолжить позже.",
                 "Прерывание теста",
                 JOptionPane.YES_NO_OPTION);
 
         if (confirm == JOptionPane.YES_OPTION) {
+            // Сохраняем текущий ответ перед выходом
+            saveCurrentAnswer();
             controller.abandonTest(sessionId);
             dispose();
         }
     }
 
     private void showResultDialog(TestResult result) {
-        // TODO: показать диалог с результатами
-        JOptionPane.showMessageDialog(this,
-                "Тест завершён!\n\n" +
-                        "Ваши результаты будут отображены в истории.",
-                "Результаты",
-                JOptionPane.INFORMATION_MESSAGE);
+        // Создаём диалог с результатами - используем this как родительское окно
+        JDialog dialog = new JDialog(this, "Результаты теста: " + result.getTestName(), true);
+        dialog.setSize(500, 400);
+        dialog.setLocationRelativeTo(this);
+
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        // Вкладка с результатами по параметрам
+        JPanel paramsPanel = createParametersPanel(result);
+        tabbedPane.addTab("📊 Результаты", paramsPanel);
+
+        // Вкладка с полной интерпретацией
+        JPanel interpretationPanel = createInterpretationPanel(result);
+        tabbedPane.addTab("📝 Интерпретация", interpretationPanel);
+
+        dialog.add(tabbedPane, BorderLayout.CENTER);
+
+        // Кнопка закрытия
+        JPanel buttonPanel = new JPanel();
+        JButton closeButton = new JButton("Закрыть");
+        closeButton.addActionListener(e -> dialog.dispose());
+        buttonPanel.add(closeButton);
+        dialog.add(buttonPanel, BorderLayout.SOUTH);
+
+        dialog.setVisible(true);
+    }
+
+    private JPanel createParametersPanel(TestResult result) {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        if (result.getScaledScores() == null || result.getScaledScores().isEmpty()) {
+            JLabel emptyLabel = new JLabel("Нет данных о результатах", SwingConstants.CENTER);
+            panel.add(emptyLabel, BorderLayout.CENTER);
+            return panel;
+        }
+
+        // Создаём таблицу
+        String[] columns = {"Параметр", "Результат", "Интерпретация"};
+        Object[][] data = new Object[result.getScaledScores().size()][3];
+
+        int i = 0;
+        for (Map.Entry<String, Integer> entry : result.getScaledScores().entrySet()) {
+            String paramName = entry.getKey();
+            data[i][0] = paramName;
+            data[i][1] = entry.getValue();
+            data[i][2] = result.getInterpretations() != null ?
+                    result.getInterpretations().get(paramName) : "";
+            i++;
+        }
+
+        JTable table = new JTable(data, columns);
+        table.setRowHeight(30);
+        table.getColumnModel().getColumn(0).setPreferredWidth(100);
+        table.getColumnModel().getColumn(1).setPreferredWidth(80);
+        table.getColumnModel().getColumn(2).setPreferredWidth(250);
+
+        JScrollPane scrollPane = new JScrollPane(table);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    private JPanel createInterpretationPanel(TestResult result) {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JTextArea interpretationArea = new JTextArea();
+        interpretationArea.setEditable(false);
+        interpretationArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        interpretationArea.setLineWrap(true);
+        interpretationArea.setWrapStyleWord(true);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("═══════════════════════════════════════════════════════════════════\n");
+        sb.append("                    РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ                        \n");
+        sb.append("═══════════════════════════════════════════════════════════════════\n\n");
+        sb.append("Тест: ").append(result.getTestName()).append("\n");
+        sb.append("───────────────────────────────────────────────────────────────────\n\n");
+
+        if (result.getScaledScores() != null) {
+            for (Map.Entry<String, Integer> entry : result.getScaledScores().entrySet()) {
+                String paramName = entry.getKey();
+                sb.append("📊 ").append(paramName).append(": ").append(entry.getValue()).append("\n");
+                if (result.getInterpretations() != null) {
+                    String interpretation = result.getInterpretations().get(paramName);
+                    if (interpretation != null && !interpretation.isEmpty()) {
+                        sb.append("   ").append(interpretation).append("\n");
+                    }
+                }
+                sb.append("\n");
+            }
+        }
+
+        interpretationArea.setText(sb.toString());
+        interpretationArea.setCaretPosition(0);
+
+        JScrollPane scrollPane = new JScrollPane(interpretationArea);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        return panel;
     }
 
     private String escapeHtml(String text) {

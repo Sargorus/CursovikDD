@@ -10,6 +10,8 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.awt.Dialog.ModalityType;
 
 public class MyResultsPanel extends JPanel {
     private TakerController controller;
