@@ -5,6 +5,7 @@ import main.java.com.psychotest.view.panels.GroupsPanel;
 import main.java.com.psychotest.view.panels.UsersPanel;
 import javax.swing.*;
 import java.awt.*;
+import main.java.com.psychotest.controller.AdminController;
 
 public class MainWindow extends JFrame {
     private User currentUser;
@@ -116,12 +117,17 @@ public class MainWindow extends JFrame {
 
     private void setupAdminPanels() {
         contentPanel.removeAll();
-        tabbedPane = new JTabbedPane();
 
-        UsersPanel usersPanel = new UsersPanel();
+        // Создаём контроллер для администратора
+        AdminController adminController = new AdminController();
+
+        // Создаём вкладки с панелями, передавая контроллер
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        UsersPanel usersPanel = new UsersPanel(adminController);
         tabbedPane.addTab("👥 Пользователи", usersPanel);
 
-        GroupsPanel groupsPanel = new GroupsPanel();
+        GroupsPanel groupsPanel = new GroupsPanel(adminController);
         tabbedPane.addTab("📁 Группы", groupsPanel);
 
         contentPanel.add(tabbedPane, BorderLayout.CENTER);

@@ -1,6 +1,6 @@
 package main.java.com.psychotest.view.panels;
 
-import main.java.com.psychotest.dao.UserDAO;
+import main.java.com.psychotest.controller.AdminController;
 import main.java.com.psychotest.model.User;
 import main.java.com.psychotest.util.PasswordUtil;
 import main.java.com.psychotest.view.dialogs.UserDialog;
@@ -10,13 +10,13 @@ import java.awt.*;
 import java.util.List;
 
 public class UsersPanel extends JPanel {
+    private AdminController controller;
     private JTable usersTable;
     private DefaultTableModel tableModel;
-    private UserDAO userDAO;
     private JTextField searchField;
 
-    public UsersPanel() {
-        userDAO = new UserDAO();
+    public UsersPanel(AdminController controller) {
+        this.controller = controller;
         initComponents();
         loadUsers();
     }
@@ -49,7 +49,6 @@ public class UsersPanel extends JPanel {
         usersTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         usersTable.getTableHeader().setReorderingAllowed(false);
 
-        // Настройка ширины колонок
         usersTable.getColumnModel().getColumn(0).setMaxWidth(50);
         usersTable.getColumnModel().getColumn(3).setMaxWidth(120);
         usersTable.getColumnModel().getColumn(4).setMaxWidth(150);
@@ -82,22 +81,18 @@ public class UsersPanel extends JPanel {
 
     private void loadUsers() {
         tableModel.setRowCount(0);
-        List<User> users = userDAO.findAll();
+        List<User> users = controller.getAllUsers();
         for (User user : users) {
             addUserToTable(user);
         }
     }
 
     private void searchUsers() {
-        String searchText = searchField.getText().toLowerCase();
+        String searchText = searchField.getText();
         tableModel.setRowCount(0);
-
-        List<User> users = userDAO.findAll();
+        List<User> users = controller.searchUsers(searchText);
         for (User user : users) {
-            if (user.getUsername().toLowerCase().contains(searchText) ||
-                    user.getFullName().toLowerCase().contains(searchText)) {
-                addUserToTable(user);
-            }
+            addUserToTable(user);
         }
     }
 
@@ -127,8 +122,8 @@ public class UsersPanel extends JPanel {
 
         if (dialog.isConfirmed()) {
             User user = dialog.getUser();
-            user.setPasswordHash(PasswordUtil.hashPassword(user.getPasswordHash()));
-            if (userDAO.save(user)) {
+            String hashedPassword = PasswordUtil.hashPassword(user.getPasswordHash());
+            if (controller.addUser(user.getUsername(), hashedPassword, user.getFullName(), user.getRole())) {
                 JOptionPane.showMessageDialog(this, "Пользователь успешно добавлен!");
                 loadUsers();
             } else {
@@ -146,7 +141,7 @@ public class UsersPanel extends JPanel {
         }
 
         int userId = (int) tableModel.getValueAt(selectedRow, 0);
-        User user = userDAO.findById(userId);
+        User user = controller.getUserById(userId);
 
         if (user != null) {
             UserDialog dialog = new UserDialog(SwingUtilities.getWindowAncestor(this), user);
@@ -154,15 +149,13 @@ public class UsersPanel extends JPanel {
 
             if (dialog.isConfirmed()) {
                 User updatedUser = dialog.getUser();
-                user.setFullName(updatedUser.getFullName());
-                user.setRole(updatedUser.getRole());
 
-                // Если пароль был изменён
-                if (updatedUser.getPasswordHash() != null && !updatedUser.getPasswordHash().isEmpty()) {
-                    user.setPasswordHash(PasswordUtil.hashPassword(updatedUser.getPasswordHash()));
-                }
-
-                if (userDAO.update(user)) {
+                if (controller.updateUser(userId, updatedUser.getFullName(), updatedUser.getRole())) {
+                    // Если пароль был изменён
+                    if (updatedUser.getPasswordHash() != null && !updatedUser.getPasswordHash().isEmpty()) {
+                        String newHashedPassword = PasswordUtil.hashPassword(updatedUser.getPasswordHash());
+                        controller.updateUserPassword(userId, newHashedPassword);
+                    }
                     JOptionPane.showMessageDialog(this, "Пользователь успешно обновлён!");
                     loadUsers();
                 } else {
@@ -188,7 +181,7 @@ public class UsersPanel extends JPanel {
 
         if (confirm == JOptionPane.YES_OPTION) {
             int userId = (int) tableModel.getValueAt(selectedRow, 0);
-            if (userDAO.delete(userId)) {
+            if (controller.deleteUser(userId)) {
                 JOptionPane.showMessageDialog(this, "Пользователь успешно удалён!");
                 loadUsers();
             } else {
