@@ -8,6 +8,7 @@ import main.java.com.psychotest.model.User;
 import main.java.com.psychotest.model.Group;
 import main.java.com.psychotest.model.TestState;
 import main.java.com.psychotest.service.TestPersistenceService;
+import main.java.com.psychotest.service.ResultService;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -20,6 +21,7 @@ public class TeacherController {
     private GroupDAO groupDAO;
     private TestPersistenceService persistenceService;
     private int teacherId;
+    private ResultService resultService;
 
     public TeacherController(int teacherId) {
         this.teacherId = teacherId;
@@ -27,6 +29,7 @@ public class TeacherController {
         this.userDAO = new UserDAO();
         this.groupDAO = new GroupDAO();
         this.persistenceService = new TestPersistenceService();
+        this.resultService = new ResultService();
     }
 
     // ========== Управление тестами ==========
@@ -181,6 +184,32 @@ public class TeacherController {
         return groups.stream()
                 .filter(g -> g.getName().toLowerCase().contains(search))
                 .toList();
+    }
+
+    // ========== Работа с результатами ==========
+
+    /**
+     * Получить все результаты для теста
+     */
+    public List<ResultService.TestResult> getResultsForTest(int testId) {
+        try {
+            return resultService.getResultsForTest(testId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Получить детальные результаты сессии
+     */
+    public ResultService.SessionDetail getSessionDetail(int sessionId) {
+        try {
+            return resultService.getSessionDetail(sessionId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     public int getTeacherId() {
