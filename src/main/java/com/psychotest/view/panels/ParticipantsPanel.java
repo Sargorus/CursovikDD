@@ -65,7 +65,7 @@ public class ParticipantsPanel extends JPanel {
         add(topPanel, BorderLayout.NORTH);
 
         // Таблица участников
-        String[] columns = {"ID", "ФИО", "Логин", "Группы", "Доступные тесты", "Пройдено"};
+        String[] columns = {"ID", "ФИО", "Логин", "Группы", "Доступные", "Пройдено"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -76,7 +76,7 @@ public class ParticipantsPanel extends JPanel {
         participantsTable = new JTable(tableModel);
         participantsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-        // ← ИЗМЕНЕНИЕ: переход по двойному клику
+        // переход по двойному клику
         participantsTable.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -172,5 +172,7 @@ public class ParticipantsPanel extends JPanel {
         if (tableModel.getRowCount() == 0) {
             tableModel.addRow(new Object[]{"", "Нет участников", "", "", "", ""});
         }
+
     }
+
 }
