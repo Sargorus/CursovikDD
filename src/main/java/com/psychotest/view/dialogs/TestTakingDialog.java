@@ -200,18 +200,19 @@ public class TestTakingDialog extends JDialog {
 
     private void saveCurrentAnswer() {
         if (questions.isEmpty() || currentQuestionIndex >= questions.size()) {
+            System.out.println("saveCurrentAnswer: вопросы не загружены");
             return;
         }
 
         Question question = questions.get(currentQuestionIndex);
         List<AnswerOption> options = question.getAnswerOptions();
+        System.out.println("Сохранение для сессии " + sessionId + ", вопрос " + question.getId());
 
         for (int i = 0; i < options.size(); i++) {
             if (answerButtons[i].isSelected()) {
                 int answerOptionId = options.get(i).getId();
-                // Сохраняем в локальный кэш
+                System.out.println("  Выбран ответ " + answerOptionId);
                 savedAnswers.put(question.getId(), answerOptionId);
-                // Сохраняем в БД
                 controller.saveAnswer(sessionId, question.getId(), answerOptionId);
                 break;
             }

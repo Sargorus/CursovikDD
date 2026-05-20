@@ -12,6 +12,10 @@ public class ResultCalculationService {
      * Рассчитывает результаты теста на основе ответов пользователя
      */
     public TestResult calculateResults(int sessionId, Test test) throws SQLException {
+        System.out.println("=== РАСЧЁТ РЕЗУЛЬТАТОВ ===");
+        System.out.println("sessionId: " + sessionId);
+        System.out.println("test: " + test.getName());
+
         TestResult result = new TestResult();
         result.setSessionId(sessionId);
         result.setTestId(test.getId());
@@ -19,14 +23,19 @@ public class ResultCalculationService {
 
         // 1. Получаем все ответы пользователя
         Map<Integer, Integer> userAnswers = getUserAnswers(sessionId);
+        System.out.println("Найдено ответов: " + userAnswers.size());
+
         if (userAnswers.isEmpty()) {
+            System.err.println("Нет сохранённых ответов для сессии " + sessionId);
             result.setErrorMessage("Нет сохранённых ответов");
             return result;
         }
 
-        // 2. Загружаем полную структуру теста (параметры, вопросы, ответы)
+        // 2. Загружаем полную структуру теста
         List<Parameter> parameters = loadParameters(test.getId());
         List<Question> questions = loadQuestionsWithAnswers(test.getId());
+        System.out.println("Загружено параметров: " + parameters.size());
+        System.out.println("Загружено вопросов: " + questions.size());
 
         // 3. Создаём маппинг вопрос -> выбранный ответ
         Map<Integer, AnswerOption> selectedAnswers = new HashMap<>();
@@ -101,13 +110,19 @@ public class ResultCalculationService {
     private Map<Integer, Integer> getUserAnswers(int sessionId) throws SQLException {
         Map<Integer, Integer> answers = new HashMap<>();
         String sql = "SELECT question_id, answer_option_id FROM user_answers WHERE session_id = ?";
+        System.out.println("SQL: " + sql + ", sessionId: " + sessionId);
+
         try (Connection conn = DatabaseConnection.getInstance().getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, sessionId);
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 answers.put(rs.getInt("question_id"), rs.getInt("answer_option_id"));
+                System.out.println("  Вопрос " + rs.getInt("question_id") + " -> Ответ " + rs.getInt("answer_option_id"));
             }
+        } catch (SQLException e) {
+            System.err.println("Ошибка при получении ответов: " + e.getMessage());
+            throw e;
         }
         return answers;
     }
