@@ -41,4 +41,9 @@ public class Test {
 
     public List<Parameter> getParameters() { return parameters; }
     public void setParameters(List<Parameter> parameters) { this.parameters = parameters; }
+
+    @Override
+    public String toString() {
+        return name != null && !name.isEmpty() ? name : "Тест #" + id;
+    }
 }
