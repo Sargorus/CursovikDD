@@ -59,7 +59,13 @@ public class TakerController {
      */
     public Test getFullTest(int testId) {
         try {
-            return testDAO.findById(testId);
+            Test test = testDAO.findById(testId);
+            if (test != null) {
+                // Загружаем вопросы для теста
+                List<Question> questions = testDAO.loadQuestionsForTest(testId);
+                test.setQuestionBank(questions);
+            }
+            return test;
         } catch (SQLException e) {
             e.printStackTrace();
             return null;

@@ -38,10 +38,29 @@ public class TestTakingDialog extends JDialog {
 
         // Загружаем вопросы теста
         Test test = controller.getFullTest(testId);
-        if (test != null && test.getQuestionBank() != null) {
+
+        // ДИАГНОСТИКА
+        System.out.println("=== ДИАГНОСТИКА ===");
+        System.out.println("testId: " + testId);
+        System.out.println("test: " + test);
+        if (test != null) {
+            System.out.println("test.getName(): " + test.getName());
+            System.out.println("test.getQuestionBank(): " + test.getQuestionBank());
+            if (test.getQuestionBank() != null) {
+                System.out.println("Количество вопросов: " + test.getQuestionBank().size());
+            }
+        }
+        System.out.println("==================");
+
+        if (test != null && test.getQuestionBank() != null && !test.getQuestionBank().isEmpty()) {
             this.questions = test.getQuestionBank();
         } else {
             this.questions = List.of();
+            JOptionPane.showMessageDialog(parent,
+                    "Тест не содержит вопросов!\nПожалуйста, сообщите преподавателю.",
+                    "Ошибка", JOptionPane.ERROR_MESSAGE);
+            dispose();
+            return;
         }
 
         // Загружаем ранее сохранённые ответы из БД
