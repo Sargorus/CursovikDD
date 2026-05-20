@@ -211,6 +211,7 @@ public class UserTestsPanel extends JPanel {
         if (result == JOptionPane.OK_OPTION) {
             Test selectedTest = (Test) testCombo.getSelectedItem();
             if (selectedTest != null) {
+                // ПЕРЕДАЁМ NULL ВМЕСТО ДАТЫ
                 boolean success = controller.assignTestToUser(selectedTest.getId(), currentUserId, null);
                 if (success) {
                     JOptionPane.showMessageDialog(this,
