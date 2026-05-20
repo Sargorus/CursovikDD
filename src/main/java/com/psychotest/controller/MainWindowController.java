@@ -2,15 +2,21 @@ package main.java.com.psychotest.controller;
 
 import main.java.com.psychotest.model.User;
 import main.java.com.psychotest.view.MainWindow;
+import main.java.com.psychotest.view.dialogs.AssignTestDialog;
+import main.java.com.psychotest.view.panels.MyTestsPanel;
+import main.java.com.psychotest.model.Test;
 import javax.swing.JOptionPane;
+import java.util.List;
 
 public class MainWindowController {
     private MainWindow window;
     private User currentUser;
+    private TeacherController teacherController;  // ← ДОБАВЬТЕ ЭТО ПОЛЕ
 
     public MainWindowController(MainWindow window, User user) {
         this.window = window;
         this.currentUser = user;
+        this.teacherController = new TeacherController(currentUser.getId());  // ← ИНИЦИАЛИЗАЦИЯ
         attachListeners();
         showWelcomeMessage();
     }
@@ -31,10 +37,10 @@ public class MainWindowController {
                 window.getCreateTestItem().addActionListener(e -> createTest());
             }
             if (window.getMyTestsItem() != null) {
-                window.getMyTestsItem().addActionListener(e -> viewMyTests());
+                window.getMyTestsItem().addActionListener(e -> showMyTests());
             }
             if (window.getAssignTestItem() != null) {
-                window.getAssignTestItem().addActionListener(e -> assignTest());
+                window.getAssignTestItem().addActionListener(e -> showAssignTest());
             }
             if (window.getViewResultsItem() != null) {
                 window.getViewResultsItem().addActionListener(e -> viewResults());
@@ -72,7 +78,8 @@ public class MainWindowController {
         }
     }
 
-    // Методы для реализации
+    // ========== Методы для администратора ==========
+
     private void manageUsers() {
         JOptionPane.showMessageDialog(window,
                 "Управление пользователями будет реализовано в следующей версии",
@@ -87,32 +94,54 @@ public class MainWindowController {
                 JOptionPane.INFORMATION_MESSAGE);
     }
 
+    // ========== Методы для преподавателя ==========
+
     private void createTest() {
         main.java.com.psychotest.view.dialogs.TestConstructorDialog dialog =
                 new main.java.com.psychotest.view.dialogs.TestConstructorDialog(window, currentUser.getId());
         dialog.setVisible(true);
     }
 
-    private void viewMyTests() {
-        JOptionPane.showMessageDialog(window,
-                "Список тестов будет отображаться здесь",
-                "Информация",
-                JOptionPane.INFORMATION_MESSAGE);
+    private void showMyTests() {
+        // Открываем панель "Мои тесты"
+        window.setContentPanel(new MyTestsPanel(teacherController));
     }
 
-    private void assignTest() {
-        JOptionPane.showMessageDialog(window,
-                "Назначение тестов будет реализовано в следующей версии",
-                "В разработке",
-                JOptionPane.INFORMATION_MESSAGE);
+    private void showAssignTest() {
+        // Сначала нужно выбрать тест
+        List<Test> tests = teacherController.getMyTests();
+        if (tests.isEmpty()) {
+            JOptionPane.showMessageDialog(window,
+                    "У вас нет созданных тестов для назначения!",
+                    "Информация", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        // Создаём диалог выбора теста
+        Test test = (Test) JOptionPane.showInputDialog(window,
+                "Выберите тест для назначения:",
+                "Назначение теста",
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                tests.toArray(),
+                tests.get(0));
+
+        if (test != null) {
+            AssignTestDialog dialog = new AssignTestDialog(window, teacherController,
+                    test.getId(), test.getName());
+            dialog.setVisible(true);
+        }
     }
 
     private void viewResults() {
+        // TODO: Открыть панель результатов
         JOptionPane.showMessageDialog(window,
                 "Просмотр результатов будет реализован в следующей версии",
                 "В разработке",
                 JOptionPane.INFORMATION_MESSAGE);
     }
+
+    // ========== Методы для тестируемого ==========
 
     private void viewAvailableTests() {
         JOptionPane.showMessageDialog(window,
@@ -127,6 +156,8 @@ public class MainWindowController {
                 "Информация",
                 JOptionPane.INFORMATION_MESSAGE);
     }
+
+    // ========== Общие методы ==========
 
     private void exit() {
         int confirm = JOptionPane.showConfirmDialog(window,

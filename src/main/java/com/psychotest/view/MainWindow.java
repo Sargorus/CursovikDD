@@ -234,7 +234,7 @@ public class MainWindow extends JFrame {
     public JMenuItem getViewResultsItem() { return viewResultsItem; }
     public JMenuItem getManageUsersItem() { return manageUsersItem; }
     public JMenuItem getManageGroupsItem() { return manageGroupsItem; }
-
+    public TeacherController getTeacherController() {return teacherController;}
     public void setContentPanel(JPanel panel) {
         contentPanel.removeAll();
         contentPanel.add(panel, BorderLayout.CENTER);
