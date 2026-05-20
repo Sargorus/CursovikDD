@@ -19,7 +19,7 @@ public class MainWindow extends JFrame {
     private JTabbedPane tabbedPane;
 
     private TeacherController teacherController;
-    private MyTestsPanel myTestsPanel;
+    private AllTestsPanel allTestsPanel;
     private ResultsViewPanel resultsPanel;
     private TakerController takerController;
     private ParticipantsPanel participantsPanel;
@@ -133,14 +133,20 @@ public class MainWindow extends JFrame {
         // Создаём контроллер для администратора
         AdminController adminController = new AdminController();
 
-        // Создаём вкладки с панелями, передавая контроллер
+        // Создаём вкладки с панелями
         JTabbedPane tabbedPane = new JTabbedPane();
 
+        // Вкладка "Пользователи"
         UsersPanel usersPanel = new UsersPanel(adminController);
         tabbedPane.addTab("👥 Пользователи", usersPanel);
 
+        // Вкладка "Группы"
         GroupsPanel groupsPanel = new GroupsPanel(adminController);
         tabbedPane.addTab("📁 Группы", groupsPanel);
+
+        // "ТЕСТЫ" (для администратора)
+        AllTestsPanel testsPanel = new AllTestsPanel();  // конструктор без параметров для админа
+        tabbedPane.addTab("📋 Тесты", testsPanel);
 
         contentPanel.add(tabbedPane, BorderLayout.CENTER);
         contentPanel.revalidate();
@@ -186,8 +192,8 @@ public class MainWindow extends JFrame {
         JTabbedPane mainTabbedPane = new JTabbedPane();
 
         // Вкладка "Мои тесты"
-        myTestsPanel = new MyTestsPanel(teacherController);
-        myTestsPanel.setOnTestSelectedListener((testId, testName) -> {
+        allTestsPanel = new AllTestsPanel(teacherController);
+        allTestsPanel.setOnTestSelectedListener((testId, testName) -> {
             if (resultsPanel != null) {
                 resultsPanel.selectTest(testId, testName);
                 // Переключаемся на вкладку результатов
@@ -199,7 +205,7 @@ public class MainWindow extends JFrame {
                 }
             }
         });
-        mainTabbedPane.addTab("📋 Мои тесты", myTestsPanel);
+        mainTabbedPane.addTab("📋 Тесты", allTestsPanel);
 
         // Вкладка "Участники" (новая)
         ParticipantsPanel participantsPanel = new ParticipantsPanel(teacherController);

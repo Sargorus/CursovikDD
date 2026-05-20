@@ -10,7 +10,7 @@ import java.awt.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-public class MyTestsPanel extends JPanel {
+public class AllTestsPanel extends JPanel {
     private TeacherController controller;
     private JTable testsTable;
     private DefaultTableModel tableModel;
@@ -18,18 +18,28 @@ public class MyTestsPanel extends JPanel {
     private JButton editButton;
     private JButton deleteButton;
     private JButton assignButton;
-    private JButton resultsButton;  // ← НОВАЯ КНОПКА
-    private OnTestSelectedListener listener;  // ← ЛИСТЕНЕР ДЛЯ ПЕРЕКЛЮЧЕНИЯ
+    private JButton resultsButton;
+    private OnTestSelectedListener listener;
+    private boolean isAdmin = false;  // ← флаг для администратора
 
-    // Интерфейс для уведомления о выборе теста
     public interface OnTestSelectedListener {
         void onTestSelected(int testId, String testName);
     }
 
-    public MyTestsPanel(TeacherController controller) {
+    // Конструктор для преподавателя
+    public AllTestsPanel(TeacherController controller) {
         this.controller = controller;
+        this.isAdmin = false;
         initComponents();
         loadTests();
+    }
+
+    // Конструктор для администратора (передаём null, так как у админа нет TeacherController)
+    public AllTestsPanel() {
+        this.controller = null;
+        this.isAdmin = true;
+        initComponents();
+        loadTestsForAdmin();
     }
 
     public void setOnTestSelectedListener(OnTestSelectedListener listener) {
@@ -54,13 +64,19 @@ public class MyTestsPanel extends JPanel {
         topPanel.add(searchPanel, BorderLayout.WEST);
 
         JButton refreshButton = new JButton("🔄 Обновить");
-        refreshButton.addActionListener(e -> loadTests());
+        refreshButton.addActionListener(e -> {
+            if (isAdmin) {
+                loadTestsForAdmin();
+            } else {
+                loadTests();
+            }
+        });
         topPanel.add(refreshButton, BorderLayout.EAST);
 
         add(topPanel, BorderLayout.NORTH);
 
         // Таблица тестов
-        String[] columns = {"ID", "Название", "Описание", "Вопросов в сессии", "Дата создания"};
+        String[] columns = {"ID", "Название", "Описание", "Автор", "Вопросов в сессии", "Дата создания"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -72,15 +88,16 @@ public class MyTestsPanel extends JPanel {
         testsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         testsTable.getSelectionModel().addListSelectionListener(e -> {
             boolean hasSelection = testsTable.getSelectedRow() != -1;
-            editButton.setEnabled(hasSelection);
-            deleteButton.setEnabled(hasSelection);
-            assignButton.setEnabled(hasSelection);
-            resultsButton.setEnabled(hasSelection);  // ← ВКЛЮЧАЕМ КНОПКУ РЕЗУЛЬТАТОВ
+            if (editButton != null) editButton.setEnabled(hasSelection);
+            if (deleteButton != null) deleteButton.setEnabled(hasSelection);
+            if (assignButton != null) assignButton.setEnabled(hasSelection);
+            if (resultsButton != null) resultsButton.setEnabled(hasSelection);
         });
 
         testsTable.getColumnModel().getColumn(0).setMaxWidth(50);
-        testsTable.getColumnModel().getColumn(3).setMaxWidth(120);
+        testsTable.getColumnModel().getColumn(3).setMaxWidth(150);
         testsTable.getColumnModel().getColumn(4).setMaxWidth(120);
+        testsTable.getColumnModel().getColumn(5).setMaxWidth(120);
 
         JScrollPane scrollPane = new JScrollPane(testsTable);
         add(scrollPane, BorderLayout.CENTER);
@@ -99,7 +116,6 @@ public class MyTestsPanel extends JPanel {
         assignButton.setEnabled(false);
         assignButton.addActionListener(e -> assignTest());
 
-        // ← НОВАЯ КНОПКА "РЕЗУЛЬТАТЫ"
         resultsButton = new JButton("📊 Результаты");
         resultsButton.setEnabled(false);
         resultsButton.addActionListener(e -> showResults());
@@ -111,27 +127,37 @@ public class MyTestsPanel extends JPanel {
         buttonPanel.add(createButton);
         buttonPanel.add(editButton);
         buttonPanel.add(assignButton);
-        buttonPanel.add(resultsButton);  // ← ДОБАВЛЯЕМ КНОПКУ
+        buttonPanel.add(resultsButton);
         buttonPanel.add(deleteButton);
 
         add(buttonPanel, BorderLayout.SOUTH);
     }
 
-    // ← НОВЫЙ МЕТОД ДЛЯ ПОКАЗА РЕЗУЛЬТАТОВ
-    private void showResults() {
-        int selectedRow = testsTable.getSelectedRow();
-        if (selectedRow == -1) {
-            return;
+    // Загрузка всех тестов для администратора
+    private void loadTestsForAdmin() {
+        tableModel.setRowCount(0);
+        List<Test> tests = getAllTestsFromDB();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+
+        for (Test test : tests) {
+            String authorName = getAuthorName(test.getCreatedBy());
+            Object[] row = {
+                    test.getId(),
+                    test.getName(),
+                    truncate(test.getDescription(), 50),
+                    authorName,
+                    test.getQuestionsPerSession() > 0 ? test.getQuestionsPerSession() : "Все",
+                    test.getCreatedAt() != null ? test.getCreatedAt().format(formatter) : ""
+            };
+            tableModel.addRow(row);
         }
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
-        String testName = (String) tableModel.getValueAt(selectedRow, 1);
-
-        if (listener != null) {
-            listener.onTestSelected(testId, testName);
+        if (tests.isEmpty()) {
+            tableModel.addRow(new Object[]{"", "Нет тестов", "", "", "", ""});
         }
     }
 
+    // Загрузка тестов для преподавателя (только свои)
     private void loadTests() {
         tableModel.setRowCount(0);
         List<Test> tests = controller.getMyTests();
@@ -142,32 +168,94 @@ public class MyTestsPanel extends JPanel {
                     test.getId(),
                     test.getName(),
                     truncate(test.getDescription(), 50),
+                    "Я",
                     test.getQuestionsPerSession() > 0 ? test.getQuestionsPerSession() : "Все",
                     test.getCreatedAt() != null ? test.getCreatedAt().format(formatter) : ""
             };
             tableModel.addRow(row);
+        }
+
+        if (tests.isEmpty()) {
+            tableModel.addRow(new Object[]{"", "Нет тестов", "", "", "", ""});
         }
     }
 
     private void searchTests() {
         String searchText = searchField.getText();
         tableModel.setRowCount(0);
-        List<Test> tests = controller.searchMyTests(searchText);
+
+        List<Test> tests;
+        if (isAdmin) {
+            tests = searchTestsInAll(searchText);
+        } else {
+            tests = controller.searchMyTests(searchText);
+        }
+
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
         for (Test test : tests) {
+            String authorName = isAdmin ? getAuthorName(test.getCreatedBy()) : "Я";
             Object[] row = {
                     test.getId(),
                     test.getName(),
                     truncate(test.getDescription(), 50),
+                    authorName,
                     test.getQuestionsPerSession() > 0 ? test.getQuestionsPerSession() : "Все",
                     test.getCreatedAt() != null ? test.getCreatedAt().format(formatter) : ""
             };
             tableModel.addRow(row);
         }
+
+        if (tests.isEmpty()) {
+            tableModel.addRow(new Object[]{"", "Нет тестов", "", "", "", ""});
+        }
+    }
+
+    // Методы для администратора (работа с БД напрямую)
+    private List<Test> getAllTestsFromDB() {
+        try {
+            main.java.com.psychotest.dao.TestDAO testDAO = new main.java.com.psychotest.dao.TestDAO();
+            return testDAO.findAll();
+        } catch (java.sql.SQLException e) {
+            e.printStackTrace();
+            return List.of();
+        }
+    }
+
+    private List<Test> searchTestsInAll(String searchText) {
+        try {
+            main.java.com.psychotest.dao.TestDAO testDAO = new main.java.com.psychotest.dao.TestDAO();
+            List<Test> allTests = testDAO.findAll();
+            if (searchText == null || searchText.trim().isEmpty()) {
+                return allTests;
+            }
+            String search = searchText.toLowerCase().trim();
+            return allTests.stream()
+                    .filter(t -> t.getName().toLowerCase().contains(search))
+                    .toList();
+        } catch (java.sql.SQLException e) {
+            e.printStackTrace();
+            return List.of();
+        }
+    }
+
+    private String getAuthorName(int createdBy) {
+        try {
+            main.java.com.psychotest.dao.UserDAO userDAO = new main.java.com.psychotest.dao.UserDAO();
+            main.java.com.psychotest.model.User user = userDAO.findById(createdBy);
+            return user != null ? user.getFullName() : "Неизвестный";
+        } catch (Exception e) {
+            return "Неизвестный";
+        }
     }
 
     private void createTest() {
+        if (isAdmin) {
+            JOptionPane.showMessageDialog(this,
+                    "Администратор не может создавать тесты.\nВойдите как преподаватель.",
+                    "Доступ запрещён", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
         TestConstructorDialog dialog = new TestConstructorDialog(
                 SwingUtilities.getWindowAncestor(this),
                 controller.getTeacherId()
@@ -203,6 +291,13 @@ public class MyTestsPanel extends JPanel {
         int testId = (int) tableModel.getValueAt(selectedRow, 0);
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
+        if (isAdmin) {
+            JOptionPane.showMessageDialog(this,
+                    "Администратор не может назначать тесты.\nВойдите как преподаватель.",
+                    "Доступ запрещён", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
         AssignTestDialog dialog = new AssignTestDialog(
                 SwingUtilities.getWindowAncestor(this),
                 controller,
@@ -210,6 +305,20 @@ public class MyTestsPanel extends JPanel {
                 testName
         );
         dialog.setVisible(true);
+    }
+
+    private void showResults() {
+        int selectedRow = testsTable.getSelectedRow();
+        if (selectedRow == -1) {
+            return;
+        }
+
+        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        String testName = (String) tableModel.getValueAt(selectedRow, 1);
+
+        if (listener != null) {
+            listener.onTestSelected(testId, testName);
+        }
     }
 
     private void deleteTest() {
@@ -230,13 +339,34 @@ public class MyTestsPanel extends JPanel {
                 JOptionPane.WARNING_MESSAGE);
 
         if (confirm == JOptionPane.YES_OPTION) {
-            if (controller.deleteTest(testId)) {
+            if (isAdmin) {
+                deleteTestAsAdmin(testId);
+            } else {
+                if (controller.deleteTest(testId)) {
+                    JOptionPane.showMessageDialog(this, "Тест успешно удалён!");
+                    loadTests();
+                } else {
+                    JOptionPane.showMessageDialog(this, "Ошибка при удалении теста!",
+                            "Ошибка", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }
+    }
+
+    private void deleteTestAsAdmin(int testId) {
+        try {
+            main.java.com.psychotest.dao.TestDAO testDAO = new main.java.com.psychotest.dao.TestDAO();
+            if (testDAO.delete(testId)) {
                 JOptionPane.showMessageDialog(this, "Тест успешно удалён!");
-                loadTests();
+                loadTestsForAdmin();
             } else {
                 JOptionPane.showMessageDialog(this, "Ошибка при удалении теста!",
                         "Ошибка", JOptionPane.ERROR_MESSAGE);
             }
+        } catch (java.sql.SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Ошибка при удалении теста: " + e.getMessage(),
+                    "Ошибка", JOptionPane.ERROR_MESSAGE);
         }
     }
 

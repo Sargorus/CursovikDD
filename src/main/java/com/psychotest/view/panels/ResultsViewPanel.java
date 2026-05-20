@@ -18,8 +18,8 @@ public class ResultsViewPanel extends JPanel {
     private DefaultTableModel tableModel;
     private JButton exportButton;
     private JButton viewDetailButton;
-    private JLabel currentTestLabel;  // ← ДЛЯ ОТОБРАЖЕНИЯ ВЫБРАННОГО ТЕСТА
-    private int preSelectedTestId = -1;  // ← ДЛЯ ПРЕДВАРИТЕЛЬНОГО ВЫБОРА
+    private JLabel currentTestLabel;
+    private int preSelectedTestId = -1;
     private String preSelectedTestName = "";
 
     public ResultsViewPanel(TeacherController controller) {
