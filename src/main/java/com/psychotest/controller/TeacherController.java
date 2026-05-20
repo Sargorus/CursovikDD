@@ -43,7 +43,7 @@ public class TeacherController {
      */
     public List<Test> getMyTests() {
         try {
-            return testDAO.findByTeacher(teacherId);
+            return testDAO.findAll();
         } catch (SQLException e) {
             e.printStackTrace();
             return new ArrayList<>();
@@ -139,7 +139,7 @@ public class TeacherController {
      * Поиск тестов по названию
      */
     public List<Test> searchMyTests(String searchText) {
-        List<Test> myTests = getMyTests();
+        List<Test> myTests = getMyTests();  // теперь это все тесты
         if (searchText == null || searchText.trim().isEmpty()) {
             return myTests;
         }
