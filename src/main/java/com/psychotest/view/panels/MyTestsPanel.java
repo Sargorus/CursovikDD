@@ -18,11 +18,22 @@ public class MyTestsPanel extends JPanel {
     private JButton editButton;
     private JButton deleteButton;
     private JButton assignButton;
+    private JButton resultsButton;  // ← НОВАЯ КНОПКА
+    private OnTestSelectedListener listener;  // ← ЛИСТЕНЕР ДЛЯ ПЕРЕКЛЮЧЕНИЯ
+
+    // Интерфейс для уведомления о выборе теста
+    public interface OnTestSelectedListener {
+        void onTestSelected(int testId, String testName);
+    }
 
     public MyTestsPanel(TeacherController controller) {
         this.controller = controller;
         initComponents();
         loadTests();
+    }
+
+    public void setOnTestSelectedListener(OnTestSelectedListener listener) {
+        this.listener = listener;
     }
 
     private void initComponents() {
@@ -64,9 +75,9 @@ public class MyTestsPanel extends JPanel {
             editButton.setEnabled(hasSelection);
             deleteButton.setEnabled(hasSelection);
             assignButton.setEnabled(hasSelection);
+            resultsButton.setEnabled(hasSelection);  // ← ВКЛЮЧАЕМ КНОПКУ РЕЗУЛЬТАТОВ
         });
 
-        // Настройка ширины колонок
         testsTable.getColumnModel().getColumn(0).setMaxWidth(50);
         testsTable.getColumnModel().getColumn(3).setMaxWidth(120);
         testsTable.getColumnModel().getColumn(4).setMaxWidth(120);
@@ -88,6 +99,11 @@ public class MyTestsPanel extends JPanel {
         assignButton.setEnabled(false);
         assignButton.addActionListener(e -> assignTest());
 
+        // ← НОВАЯ КНОПКА "РЕЗУЛЬТАТЫ"
+        resultsButton = new JButton("📊 Результаты");
+        resultsButton.setEnabled(false);
+        resultsButton.addActionListener(e -> showResults());
+
         deleteButton = new JButton("🗑️ Удалить");
         deleteButton.setEnabled(false);
         deleteButton.addActionListener(e -> deleteTest());
@@ -95,9 +111,25 @@ public class MyTestsPanel extends JPanel {
         buttonPanel.add(createButton);
         buttonPanel.add(editButton);
         buttonPanel.add(assignButton);
+        buttonPanel.add(resultsButton);  // ← ДОБАВЛЯЕМ КНОПКУ
         buttonPanel.add(deleteButton);
 
         add(buttonPanel, BorderLayout.SOUTH);
+    }
+
+    // ← НОВЫЙ МЕТОД ДЛЯ ПОКАЗА РЕЗУЛЬТАТОВ
+    private void showResults() {
+        int selectedRow = testsTable.getSelectedRow();
+        if (selectedRow == -1) {
+            return;
+        }
+
+        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        String testName = (String) tableModel.getValueAt(selectedRow, 1);
+
+        if (listener != null) {
+            listener.onTestSelected(testId, testName);
+        }
     }
 
     private void loadTests() {
@@ -141,7 +173,7 @@ public class MyTestsPanel extends JPanel {
                 controller.getTeacherId()
         );
         dialog.setVisible(true);
-        loadTests(); // Обновляем список после создания
+        loadTests();
     }
 
     private void editTest() {
@@ -171,7 +203,6 @@ public class MyTestsPanel extends JPanel {
         int testId = (int) tableModel.getValueAt(selectedRow, 0);
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
-        // Открываем диалог назначения теста
         AssignTestDialog dialog = new AssignTestDialog(
                 SwingUtilities.getWindowAncestor(this),
                 controller,
