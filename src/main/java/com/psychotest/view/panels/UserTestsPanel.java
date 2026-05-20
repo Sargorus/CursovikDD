@@ -145,7 +145,7 @@ public class UserTestsPanel extends JPanel {
                     test.getId(),
                     test.getName(),
                     "Да",
-                    isCompleted ? "Завершён" : "Назначен",
+                    isCompleted ? "Завершён" : "Не завершён",
                     isCompleted && completed.getEndTime() != null ?
                             completed.getEndTime().format(formatter) : "—",
                     isCompleted ? "Просмотреть" : "—"

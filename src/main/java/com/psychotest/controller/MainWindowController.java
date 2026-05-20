@@ -3,7 +3,7 @@ package main.java.com.psychotest.controller;
 import main.java.com.psychotest.model.User;
 import main.java.com.psychotest.view.MainWindow;
 import main.java.com.psychotest.view.dialogs.AssignTestDialog;
-import main.java.com.psychotest.view.panels.MyTestsPanel;
+import main.java.com.psychotest.view.panels.AllTestsPanel;
 import main.java.com.psychotest.model.Test;
 import javax.swing.JOptionPane;
 import java.util.List;
@@ -104,7 +104,7 @@ public class MainWindowController {
 
     private void showMyTests() {
         // Открываем панель "Мои тесты"
-        window.setContentPanel(new MyTestsPanel(teacherController));
+        window.setContentPanel(new AllTestsPanel(teacherController));
     }
 
     private void showAssignTest() {
