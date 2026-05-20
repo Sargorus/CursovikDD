@@ -112,7 +112,7 @@ public class TeacherController {
     /**
      * Назначить тест пользователю
      */
-    public boolean assignTestToUser(int testId, int userId, Date dueDate) {
+    /*public boolean assignTestToUser(int testId, int userId, Date dueDate) {
         try {
             return testDAO.assignToUser(testId, teacherId, userId, new java.sql.Date(dueDate.getTime()));
         } catch (SQLException e) {
@@ -120,7 +120,7 @@ public class TeacherController {
             return false;
         }
     }
-
+    */
     /**
      * Назначить тест группе
      */
