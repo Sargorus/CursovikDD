@@ -110,18 +110,6 @@ public class TeacherController {
     }
 
     /**
-     * Назначить тест пользователю
-     */
-    /*public boolean assignTestToUser(int testId, int userId, Date dueDate) {
-        try {
-            return testDAO.assignToUser(testId, teacherId, userId, new java.sql.Date(dueDate.getTime()));
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-    */
-    /**
      * Назначить тест группе
      */
     public boolean assignTestToGroup(int testId, int groupId, Date dueDate) {
@@ -286,5 +274,85 @@ public class TeacherController {
             e.printStackTrace();
         }
         return -1;
+    }
+
+    /**
+     * Получить группы пользователя
+     */
+    public List<Group> getUserGroups(int userId) {
+        return groupDAO.findGroupsByUser(userId);
+    }
+
+    /**
+     * Получить количество назначенных тестов для пользователя
+     */
+    public int getUserTestCount(int userId) {
+        try {
+            return testDAO.getAssignedTestCountForUser(userId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * Получить количество пройденных тестов для пользователя
+     */
+    public int getUserCompletedTestCount(int userId) {
+        try {
+            return testDAO.getCompletedTestCountForUser(userId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * Получить ID назначенных тестов для пользователя
+     */
+    public List<Integer> getAssignedTestIdsForUser(int userId) {
+        try {
+            return testDAO.getAssignedTestIdsForUser(userId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Получить завершённые сессии пользователя
+     */
+    public List<TestSession> getCompletedSessionsForUser(int userId) {
+        try {
+            return sessionDAO.getCompletedSessionsForUser(userId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Назначить тест пользователю
+     */
+    public boolean assignTestToUser(int testId, int userId, Date dueDate) {
+        try {
+            return testDAO.assignToUser(testId, teacherId, userId,
+                    dueDate != null ? new java.sql.Date(dueDate.getTime()) : null);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Отвязать тест от пользователя (удалить назначение)
+     */
+    public boolean unassignTestFromUser(int testId, int userId) {
+        try {
+            return testDAO.unassignTestFromUser(testId, userId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 }

@@ -506,4 +506,66 @@ public class TestDAO {
         }
         return impacts;
     }
+
+    /**
+     * Получить количество назначенных тестов для пользователя
+     */
+    public int getAssignedTestCountForUser(int userId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM test_assignments WHERE assigned_to_user = ?";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Получить количество пройденных тестов для пользователя
+     */
+    public int getCompletedTestCountForUser(int userId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM test_sessions WHERE user_id = ? AND status = 'COMPLETED'";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Получить ID назначенных тестов для пользователя
+     */
+    public List<Integer> getAssignedTestIdsForUser(int userId) throws SQLException {
+        List<Integer> testIds = new ArrayList<>();
+        String sql = "SELECT test_id FROM test_assignments WHERE assigned_to_user = ?";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                testIds.add(rs.getInt(1));
+            }
+        }
+        return testIds;
+    }
+
+    /**
+     * Удалить назначение теста пользователю
+     */
+    public boolean unassignTestFromUser(int testId, int userId) throws SQLException {
+        String sql = "DELETE FROM test_assignments WHERE test_id = ? AND assigned_to_user = ?";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, testId);
+            pstmt.setInt(2, userId);
+            return pstmt.executeUpdate() > 0;
+        }
+    }
 }
