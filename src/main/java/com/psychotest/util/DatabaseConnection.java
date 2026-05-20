@@ -37,6 +37,7 @@ public class DatabaseConnection {
         try {
             if (connection == null || connection.isClosed()) {
                 connection = DriverManager.getConnection(url, username, password);
+                connection.setAutoCommit(true);  // ← ДОЛЖНО БЫТЬ true
                 System.out.println("✓ Connected to PostgreSQL database!");
             }
             return connection;

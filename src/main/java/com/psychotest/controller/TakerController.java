@@ -79,8 +79,16 @@ public class TakerController {
      */
     public int startTest(int testId) {
         try {
-            return sessionDAO.createSession(userId, testId);
+            System.out.println("=== НАЧАЛО ТЕСТА ===");
+            System.out.println("userId: " + userId);
+            System.out.println("testId: " + testId);
+
+            int sessionId = sessionDAO.createSession(userId, testId);
+            System.out.println("sessionId: " + sessionId);
+
+            return sessionId;
         } catch (SQLException e) {
+            System.err.println("Ошибка при создании сессии: " + e.getMessage());
             e.printStackTrace();
             return -1;
         }
@@ -104,26 +112,37 @@ public class TakerController {
      */
     public TestResult calculateAndCompleteTest(int sessionId) {
         try {
-            // Получаем сессию и тест
+            // Получаем сессию
             TestSession session = sessionDAO.getSession(sessionId);
             if (session == null) {
+                System.err.println("Сессия не найдена: " + sessionId);
                 return null;
             }
 
             // Получаем полный тест
-            Test test = testDAO.findById(session.getTestId());
+            Test test = getFullTest(session.getTestId());
             if (test == null) {
+                System.err.println("Тест не найден: " + session.getTestId());
                 return null;
             }
 
             // Рассчитываем результаты
             TestResult result = resultService.calculateResults(sessionId, test);
+            if (result == null) {
+                System.err.println("Результат не рассчитан");
+                return null;
+            }
 
             // Завершаем сессию
             sessionDAO.completeSession(sessionId);
 
             return result;
         } catch (SQLException e) {
+            System.err.println("SQL ошибка: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        } catch (Exception e) {
+            System.err.println("Общая ошибка: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
@@ -216,4 +235,6 @@ public class TakerController {
         }
         return answers;
     }
+
+
 }

@@ -22,9 +22,13 @@ public class TestSessionDAO {
             pstmt.setInt(1, userId);
             pstmt.setInt(2, testId);
             ResultSet rs = pstmt.executeQuery();
-            rs.next();
-            return rs.getInt(1);
+            if (rs.next()) {
+                int id = rs.getInt(1);
+                System.out.println("Создана сессия ID=" + id + " для user=" + userId + ", test=" + testId);
+                return id;
+            }
         }
+        return -1;
     }
 
     /**
@@ -38,7 +42,8 @@ public class TestSessionDAO {
             pstmt.setInt(1, sessionId);
             pstmt.setInt(2, questionId);
             pstmt.setInt(3, answerOptionId);
-            pstmt.executeUpdate();
+            int rows = pstmt.executeUpdate();
+            System.out.println("Сохранён ответ: rows=" + rows + ", session=" + sessionId + ", question=" + questionId);
         }
     }
 
