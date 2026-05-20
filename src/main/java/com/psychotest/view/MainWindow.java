@@ -1,10 +1,13 @@
 package main.java.com.psychotest.view;
 
+import main.java.com.psychotest.view.panels.*;
+import main.java.com.psychotest.controller.TakerController;
 import main.java.com.psychotest.model.User;
-import main.java.com.psychotest.view.panels.GroupsPanel;
-import main.java.com.psychotest.view.panels.UsersPanel;
+
 import javax.swing.*;
 import java.awt.*;
+import main.java.com.psychotest.controller.AdminController;
+import main.java.com.psychotest.controller.TeacherController;
 
 public class MainWindow extends JFrame {
     private User currentUser;
@@ -15,6 +18,8 @@ public class MainWindow extends JFrame {
     private JLabel welcomeLabel;
     private JPanel contentPanel;
     private JTabbedPane tabbedPane;
+    private TeacherController teacherController;
+    private TakerController takerController;
 
     public MainWindow(User user) {
         this.currentUser = user;
@@ -26,6 +31,12 @@ public class MainWindow extends JFrame {
 
         if (currentUser.getRole().equals("ADMIN")) {
             setupAdminPanels();
+        } else if (currentUser.getRole().equals("TEACHER")) {
+            this.teacherController = new TeacherController(currentUser.getId());
+            setupTeacherPanels();
+        } else if (currentUser.getRole().equals("TAKER")) {
+            this.takerController = new TakerController(currentUser.getId());
+            setupTakerPanels();
         }
     }
 
@@ -116,12 +127,17 @@ public class MainWindow extends JFrame {
 
     private void setupAdminPanels() {
         contentPanel.removeAll();
-        tabbedPane = new JTabbedPane();
 
-        UsersPanel usersPanel = new UsersPanel();
+        // Создаём контроллер для администратора
+        AdminController adminController = new AdminController();
+
+        // Создаём вкладки с панелями, передавая контроллер
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        UsersPanel usersPanel = new UsersPanel(adminController);
         tabbedPane.addTab("👥 Пользователи", usersPanel);
 
-        GroupsPanel groupsPanel = new GroupsPanel();
+        GroupsPanel groupsPanel = new GroupsPanel(adminController);
         tabbedPane.addTab("📁 Группы", groupsPanel);
 
         contentPanel.add(tabbedPane, BorderLayout.CENTER);
@@ -161,6 +177,44 @@ public class MainWindow extends JFrame {
         }
     }
 
+    // Метод для отображения панелей преподавателя
+    private void setupTeacherPanels() {
+        contentPanel.removeAll();
+
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        // Панель "Мои тесты"
+        MyTestsPanel myTestsPanel = new MyTestsPanel(teacherController);
+        tabbedPane.addTab("📋 Мои тесты", myTestsPanel);
+
+        // Панель "Результаты"
+        ResultsViewPanel resultsPanel = new ResultsViewPanel(teacherController);
+        tabbedPane.addTab("📊 Результаты", resultsPanel);
+
+        // Панель "Назначения" (опционально, позже)
+        contentPanel.add(tabbedPane, BorderLayout.CENTER);
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
+    private void setupTakerPanels() {
+        contentPanel.removeAll();
+
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        // Панель "Доступные тесты"
+        AvailableTestsPanel availableTestsPanel = new AvailableTestsPanel(takerController);
+        tabbedPane.addTab("📋 Доступные тесты", availableTestsPanel);
+
+        // Панель "Мои результаты" (позже)
+        MyResultsPanel myResultsPanel = new MyResultsPanel(takerController);
+        tabbedPane.addTab("📊 Мои результаты", myResultsPanel);
+
+        contentPanel.add(tabbedPane, BorderLayout.CENTER);
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
     public void setContentComponent(Component component) {
         contentPanel.removeAll();
         contentPanel.add(component, BorderLayout.CENTER);
@@ -187,4 +241,6 @@ public class MainWindow extends JFrame {
         contentPanel.revalidate();
         contentPanel.repaint();
     }
+
+
 }

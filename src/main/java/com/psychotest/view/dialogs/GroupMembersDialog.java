@@ -1,7 +1,6 @@
 package main.java.com.psychotest.view.dialogs;
 
-import main.java.com.psychotest.dao.GroupDAO;
-import main.java.com.psychotest.dao.UserDAO;
+import main.java.com.psychotest.controller.AdminController;
 import main.java.com.psychotest.model.Group;
 import main.java.com.psychotest.model.User;
 import javax.swing.*;
@@ -12,8 +11,7 @@ import java.util.List;
 
 public class GroupMembersDialog extends JDialog {
     private Group group;
-    private GroupDAO groupDAO;
-    private UserDAO userDAO;
+    private AdminController controller;
     private JTable membersTable;
     private JTable availableUsersTable;
     private DefaultTableModel membersModel;
@@ -21,11 +19,10 @@ public class GroupMembersDialog extends JDialog {
     private List<User> allUsers;
     private boolean confirmed = false;
 
-    public GroupMembersDialog(Window parent, Group group, List<User> allAvailableUsers) {
+    public GroupMembersDialog(Window parent, Group group, List<User> allAvailableUsers, AdminController controller) {
         super(parent, "Управление участниками группы: " + group.getName(), ModalityType.APPLICATION_MODAL);
         this.group = group;
-        this.groupDAO = new GroupDAO();
-        this.userDAO = new UserDAO();
+        this.controller = controller;
         this.allUsers = new ArrayList<>(allAvailableUsers);
         initComponents();
         loadData();
@@ -36,7 +33,6 @@ public class GroupMembersDialog extends JDialog {
     private void initComponents() {
         setLayout(new BorderLayout(10, 10));
 
-        // Основная панель с двумя таблицами
         JPanel mainPanel = new JPanel(new GridLayout(1, 2, 10, 10));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -100,7 +96,6 @@ public class GroupMembersDialog extends JDialog {
 
         add(mainPanel, BorderLayout.CENTER);
 
-        // Нижняя панель с кнопками
         JPanel buttonPanel = new JPanel(new FlowLayout());
 
         JButton saveButton = new JButton("💾 Сохранить и закрыть");
@@ -116,10 +111,7 @@ public class GroupMembersDialog extends JDialog {
     }
 
     private void loadData() {
-        // Загружаем участников группы
         loadMembers();
-
-        // Загружаем всех пользователей (кроме администраторов?)
         loadAllUsers();
     }
 
@@ -137,10 +129,7 @@ public class GroupMembersDialog extends JDialog {
     }
 
     private void loadAllUsers() {
-        // Загружаем всех пользователей, кроме текущего администратора (опционально)
-        // Исключаем уже состоящих в группе
         List<User> usersToShow = new ArrayList<>();
-
         for (User user : allUsers) {
             boolean alreadyInGroup = false;
             for (User member : group.getMembers()) {
@@ -203,8 +192,7 @@ public class GroupMembersDialog extends JDialog {
         if (selectedRow == -1) {
             JOptionPane.showMessageDialog(this,
                     "Выберите пользователя для добавления в группу!",
-                    "Предупреждение",
-                    JOptionPane.WARNING_MESSAGE);
+                    "Предупреждение", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
@@ -213,13 +201,11 @@ public class GroupMembersDialog extends JDialog {
 
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Добавить пользователя '" + userName + "' в группу?",
-                "Подтверждение",
-                JOptionPane.YES_NO_OPTION);
+                "Подтверждение", JOptionPane.YES_NO_OPTION);
 
         if (confirm == JOptionPane.YES_OPTION) {
-            if (groupDAO.addUserToGroup(userId, group.getId())) {
-                // Обновляем данные
-                User addedUser = userDAO.findById(userId);
+            if (controller.addUserToGroup(userId, group.getId())) {
+                User addedUser = controller.getUserById(userId);
                 if (addedUser != null) {
                     group.addMember(addedUser);
                 }
@@ -229,8 +215,7 @@ public class GroupMembersDialog extends JDialog {
             } else {
                 JOptionPane.showMessageDialog(this,
                         "Ошибка при добавлении пользователя!",
-                        "Ошибка",
-                        JOptionPane.ERROR_MESSAGE);
+                        "Ошибка", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -240,8 +225,7 @@ public class GroupMembersDialog extends JDialog {
         if (selectedRow == -1) {
             JOptionPane.showMessageDialog(this,
                     "Выберите участника для удаления из группы!",
-                    "Предупреждение",
-                    JOptionPane.WARNING_MESSAGE);
+                    "Предупреждение", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
@@ -250,12 +234,10 @@ public class GroupMembersDialog extends JDialog {
 
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Удалить пользователя '" + userName + "' из группы?",
-                "Подтверждение",
-                JOptionPane.YES_NO_OPTION);
+                "Подтверждение", JOptionPane.YES_NO_OPTION);
 
         if (confirm == JOptionPane.YES_OPTION) {
-            if (groupDAO.removeUserFromGroup(userId, group.getId())) {
-                // Обновляем данные
+            if (controller.removeUserFromGroup(userId, group.getId())) {
                 User removedUser = null;
                 for (User u : group.getMembers()) {
                     if (u.getId() == userId) {
@@ -272,8 +254,7 @@ public class GroupMembersDialog extends JDialog {
             } else {
                 JOptionPane.showMessageDialog(this,
                         "Ошибка при удалении пользователя!",
-                        "Ошибка",
-                        JOptionPane.ERROR_MESSAGE);
+                        "Ошибка", JOptionPane.ERROR_MESSAGE);
             }
         }
     }

@@ -1,7 +1,6 @@
 package main.java.com.psychotest.view.panels;
 
-import main.java.com.psychotest.dao.GroupDAO;
-import main.java.com.psychotest.dao.UserDAO;
+import main.java.com.psychotest.controller.AdminController;
 import main.java.com.psychotest.model.Group;
 import main.java.com.psychotest.model.User;
 import main.java.com.psychotest.view.dialogs.GroupDialog;
@@ -9,18 +8,15 @@ import main.java.com.psychotest.view.dialogs.GroupMembersDialog;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.util.ArrayList;
 import java.util.List;
 
 public class GroupsPanel extends JPanel {
+    private AdminController controller;
     private JTable groupsTable;
     private DefaultTableModel tableModel;
-    private GroupDAO groupDAO;
-    private UserDAO userDAO;
 
-    public GroupsPanel() {
-        groupDAO = new GroupDAO();
-        userDAO = new UserDAO();
+    public GroupsPanel(AdminController controller) {
+        this.controller = controller;
         initComponents();
         loadGroups();
     }
@@ -72,7 +68,7 @@ public class GroupsPanel extends JPanel {
 
     private void loadGroups() {
         tableModel.setRowCount(0);
-        List<Group> groups = groupDAO.findAll();
+        List<Group> groups = controller.getAllGroups();
         for (Group group : groups) {
             Object[] row = {
                     group.getId(),
@@ -90,7 +86,7 @@ public class GroupsPanel extends JPanel {
 
         if (dialog.isConfirmed()) {
             Group group = dialog.getGroup();
-            if (groupDAO.save(group)) {
+            if (controller.addGroup(group.getName(), group.getDescription())) {
                 JOptionPane.showMessageDialog(this, "Группа успешно добавлена!");
                 loadGroups();
             } else {
@@ -107,7 +103,7 @@ public class GroupsPanel extends JPanel {
         }
 
         int groupId = (int) tableModel.getValueAt(selectedRow, 0);
-        Group group = groupDAO.findById(groupId);
+        Group group = controller.getGroupById(groupId);
 
         if (group != null) {
             GroupDialog dialog = new GroupDialog(SwingUtilities.getWindowAncestor(this), group);
@@ -115,10 +111,7 @@ public class GroupsPanel extends JPanel {
 
             if (dialog.isConfirmed()) {
                 Group updatedGroup = dialog.getGroup();
-                group.setName(updatedGroup.getName());
-                group.setDescription(updatedGroup.getDescription());
-
-                if (groupDAO.update(group)) {
+                if (controller.updateGroup(groupId, updatedGroup.getName(), updatedGroup.getDescription())) {
                     JOptionPane.showMessageDialog(this, "Группа успешно обновлена!");
                     loadGroups();
                 } else {
@@ -136,30 +129,14 @@ public class GroupsPanel extends JPanel {
         }
 
         int groupId = (int) tableModel.getValueAt(selectedRow, 0);
-        Group group = groupDAO.findById(groupId);
+        Group group = controller.getGroupById(groupId);
 
         if (group != null) {
-            // Получаем ВСЕХ пользователей (не только TAKER)
-            List<User> allUsers = userDAO.findAll();
-
-            // Опционально: исключаем администраторов из списка (если нужно)
-            List<User> availableUsers = new ArrayList<>();
-            for (User u : allUsers) {
-                // Исключаем администраторов? Если да - раскомментируйте:
-                // if (!u.getRole().equals("ADMIN")) {
-                //     availableUsers.add(u);
-                // }
-                availableUsers.add(u);
-            }
-
+            List<User> allUsers = controller.getAllUsers();
             GroupMembersDialog dialog = new GroupMembersDialog(
-                    SwingUtilities.getWindowAncestor(this), group, availableUsers);
+                    SwingUtilities.getWindowAncestor(this), group, allUsers, controller);
             dialog.setVisible(true);
-
-            if (dialog.isConfirmed()) {
-                // Обновляем отображение
-                loadGroups();
-            }
+            loadGroups(); // Обновляем отображение
         }
     }
 
@@ -179,7 +156,7 @@ public class GroupsPanel extends JPanel {
 
         if (confirm == JOptionPane.YES_OPTION) {
             int groupId = (int) tableModel.getValueAt(selectedRow, 0);
-            if (groupDAO.delete(groupId)) {
+            if (controller.deleteGroup(groupId)) {
                 JOptionPane.showMessageDialog(this, "Группа успешно удалена!");
                 loadGroups();
             } else {
