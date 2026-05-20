@@ -431,4 +431,79 @@ public class TestDAO {
         }
         return testIds;
     }
+
+    /**
+     * Загружает все вопросы для теста с их ответами
+     */
+    public List<Question> loadQuestionsForTest(int testId) throws SQLException {
+        List<Question> questions = new ArrayList<>();
+        String sql = "SELECT * FROM questions WHERE test_id = ? ORDER BY order_num";
+
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, testId);
+            ResultSet rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                Question question = new Question();
+                question.setId(rs.getInt("id"));
+                question.setTestId(rs.getInt("test_id"));
+                question.setText(rs.getString("text"));
+                question.setOrderNum(rs.getInt("order_num"));
+
+                // Загружаем ответы для вопроса
+                question.setAnswerOptions(loadAnswerOptionsForQuestion(question.getId()));
+                questions.add(question);
+            }
+        }
+        return questions;
+    }
+
+    /**
+     * Загружает варианты ответов для вопроса
+     */
+    private List<AnswerOption> loadAnswerOptionsForQuestion(int questionId) throws SQLException {
+        List<AnswerOption> options = new ArrayList<>();
+        String sql = "SELECT * FROM answer_options WHERE question_id = ? ORDER BY order_num";
+
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, questionId);
+            ResultSet rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                AnswerOption option = new AnswerOption();
+                option.setId(rs.getInt("id"));
+                option.setQuestionId(rs.getInt("question_id"));
+                option.setText(rs.getString("text"));
+                option.setOrderNum(rs.getInt("order_num"));
+
+                // Загружаем влияния ответа на параметры
+                option.setParameterImpacts(loadImpactsForOption(option.getId()));
+                options.add(option);
+            }
+        }
+        return options;
+    }
+
+    /**
+     * Загружает влияния ответа на параметры
+     */
+    private Map<Integer, Integer> loadImpactsForOption(int optionId) throws SQLException {
+        Map<Integer, Integer> impacts = new HashMap<>();
+        String sql = "SELECT parameter_id, delta FROM answer_parameter_impact WHERE answer_option_id = ?";
+
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, optionId);
+            ResultSet rs = pstmt.executeQuery();
+
+            // Нам нужен индекс параметра, а не ID
+            // Пока сохраняем как есть, потом преобразуем
+            while (rs.next()) {
+                impacts.put(rs.getInt("parameter_id"), rs.getInt("delta"));
+            }
+        }
+        return impacts;
+    }
 }
