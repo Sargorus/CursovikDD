@@ -1,12 +1,10 @@
 package main.java.com.psychotest.controller;
 
 import main.java.com.psychotest.dao.TestDAO;
+import main.java.com.psychotest.dao.TestSessionDAO;
 import main.java.com.psychotest.dao.UserDAO;
 import main.java.com.psychotest.dao.GroupDAO;
-import main.java.com.psychotest.model.Test;
-import main.java.com.psychotest.model.User;
-import main.java.com.psychotest.model.Group;
-import main.java.com.psychotest.model.TestState;
+import main.java.com.psychotest.model.*;
 import main.java.com.psychotest.service.TestPersistenceService;
 import main.java.com.psychotest.service.ResultService;
 import main.java.com.psychotest.service.ExcelReportService;
@@ -25,6 +23,7 @@ public class TeacherController {
     private int teacherId;
     private ResultService resultService;
     private ExcelReportService excelService;
+    private TestSessionDAO sessionDAO;
 
     public TeacherController(int teacherId) {
         this.teacherId = teacherId;
@@ -34,6 +33,7 @@ public class TeacherController {
         this.persistenceService = new TestPersistenceService();
         this.resultService = new ResultService();
         this.excelService = new ExcelReportService();
+        this.sessionDAO = new TestSessionDAO();
     }
 
     // ========== Управление тестами ==========

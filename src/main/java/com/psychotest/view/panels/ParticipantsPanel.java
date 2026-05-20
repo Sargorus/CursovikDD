@@ -6,6 +6,8 @@ import main.java.com.psychotest.model.User;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -63,7 +65,7 @@ public class ParticipantsPanel extends JPanel {
         add(topPanel, BorderLayout.NORTH);
 
         // Таблица участников
-        String[] columns = {"ID", "ФИО", "Логин", "Группы", "Всего тестов", "Пройдено"};
+        String[] columns = {"ID", "ФИО", "Логин", "Группы", "Доступные тесты", "Пройдено"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -73,12 +75,19 @@ public class ParticipantsPanel extends JPanel {
 
         participantsTable = new JTable(tableModel);
         participantsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        participantsTable.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting() && participantsTable.getSelectedRow() != -1 && listener != null) {
-                int row = participantsTable.getSelectedRow();
-                int userId = (int) tableModel.getValueAt(row, 0);
-                String userName = (String) tableModel.getValueAt(row, 1);
-                listener.onParticipantSelected(userId, userName);
+
+        // ← ИЗМЕНЕНИЕ: переход по двойному клику
+        participantsTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {  // двойной клик
+                    int row = participantsTable.getSelectedRow();
+                    if (row != -1 && listener != null) {
+                        int userId = (int) tableModel.getValueAt(row, 0);
+                        String userName = (String) tableModel.getValueAt(row, 1);
+                        listener.onParticipantSelected(userId, userName);
+                    }
+                }
             }
         });
 
