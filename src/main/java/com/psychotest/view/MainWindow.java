@@ -17,6 +17,8 @@ public class MainWindow extends JFrame {
     private JLabel welcomeLabel;
     private JPanel contentPanel;
     private JTabbedPane tabbedPane;
+    private JPanel statusBar;
+    private JLabel statusLabel;
 
     private TeacherController teacherController;
     private AllTestsPanel allTestsPanel;
@@ -30,6 +32,7 @@ public class MainWindow extends JFrame {
         initComponents();
         setupLayout();
         setupMenu();
+        setupStatusBar();
 
         if (currentUser.getRole().equals("ADMIN")) {
             setupAdminPanels();
@@ -39,6 +42,15 @@ public class MainWindow extends JFrame {
         } else if (currentUser.getRole().equals("TAKER")) {
             this.takerController = new TakerController(currentUser.getId());
             setupTakerPanels();
+        }
+    }
+
+    private String getRoleName(String role) {
+        switch (role) {
+            case "ADMIN": return "Администратор";
+            case "TEACHER": return "Преподаватель";
+            case "TAKER": return "Тестируемый";
+            default: return role;
         }
     }
 
@@ -60,6 +72,40 @@ public class MainWindow extends JFrame {
         add(contentPanel, BorderLayout.CENTER);
     }
 
+    // СОЗДАНИЕ СТАТУСНОЙ СТРОКИ
+    private void setupStatusBar() {
+        statusBar = new JPanel(new BorderLayout());
+        statusBar.setBorder(BorderFactory.createEtchedBorder());
+        statusBar.setBackground(new Color(240, 240, 240));
+        statusBar.setPreferredSize(new Dimension(getWidth(), 30));
+
+        // Левая часть - информация о пользователе
+        // Используем существующий метод getRoleName() из класса MainWindow
+        String roleName = getRoleName(currentUser.getRole());  // ← этот метод уже есть в классе
+        statusLabel = new JLabel("  👤 " + currentUser.getFullName() + " | Роль: " + roleName + " | Логин: " + currentUser.getUsername());
+        statusLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        statusBar.add(statusLabel, BorderLayout.WEST);
+
+        // Правая часть - текущая дата и время
+        JLabel dateLabel = new JLabel(getCurrentDateTime() + "  ");
+        dateLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+        dateLabel.setForeground(Color.GRAY);
+        statusBar.add(dateLabel, BorderLayout.EAST);
+
+        // Таймер для обновления времени
+        new Timer(1000, e -> {
+            dateLabel.setText(getCurrentDateTime() + "  ");
+        }).start();
+
+        add(statusBar, BorderLayout.SOUTH);
+    }
+
+    private String getCurrentDateTime() {
+        return java.time.LocalDateTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")
+        );
+    }
+
     private void setupMenu() {
         menuBar = new JMenuBar();
 
@@ -77,6 +123,15 @@ public class MainWindow extends JFrame {
         accountMenu.add(logoutItem);
         menuBar.add(accountMenu);
 
+        // Иформация о поьзователе в меню
+        JMenuItem userInfoItem = new JMenuItem("Информация о пользователе");
+        userInfoItem.addActionListener(e -> showUserInfo());
+        accountMenu.add(userInfoItem);
+        accountMenu.addSeparator();
+        accountMenu.add(logoutItem);
+
+        menuBar.add(accountMenu);
+
         // В зависимости от роли добавляем разные меню
         switch (currentUser.getRole()) {
             case "ADMIN":
@@ -91,6 +146,29 @@ public class MainWindow extends JFrame {
         }
 
         setJMenuBar(menuBar);
+    }
+
+    // МЕТОД ДЛЯ ПОКАЗА ИНФОРМАЦИИ О ПОЛЬЗОВАТЕЛЕ
+    private void showUserInfo() {
+        String message = String.format(
+                "═══════════════════════════════════════\n" +
+                        "        ИНФОРМАЦИЯ О ПОЛЬЗОВАТЕЛЕ        \n" +
+                        "═══════════════════════════════════════\n\n" +
+                        "👤 ФИО: %s\n" +
+                        "🔑 Логин: %s\n" +
+                        "⭐ Роль: %s\n" +
+                        "🆔 ID: %d\n" +
+                        "📅 Дата регистрации: %s\n" +
+                        "═══════════════════════════════════════",
+                currentUser.getFullName(),
+                currentUser.getUsername(),
+                getRoleName(currentUser.getRole()),
+                currentUser.getId(),
+                currentUser.getCreatedAt() != null ?
+                        currentUser.getCreatedAt().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")) :
+                        "Неизвестно"
+        );
+        JOptionPane.showMessageDialog(this, message, "Информация о пользователе", JOptionPane.INFORMATION_MESSAGE);
     }
 
     private void setupAdminMenu() {
