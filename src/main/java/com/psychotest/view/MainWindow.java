@@ -1,13 +1,12 @@
 package main.java.com.psychotest.view;
 
-import main.java.com.psychotest.view.panels.*;
-import main.java.com.psychotest.controller.TakerController;
-import main.java.com.psychotest.model.User;
-
-import javax.swing.*;
-import java.awt.*;
 import main.java.com.psychotest.controller.AdminController;
 import main.java.com.psychotest.controller.TeacherController;
+import main.java.com.psychotest.controller.TakerController;
+import main.java.com.psychotest.model.User;
+import main.java.com.psychotest.view.panels.*;
+import javax.swing.*;
+import java.awt.*;
 
 public class MainWindow extends JFrame {
     private User currentUser;
@@ -18,7 +17,10 @@ public class MainWindow extends JFrame {
     private JLabel welcomeLabel;
     private JPanel contentPanel;
     private JTabbedPane tabbedPane;
+
     private TeacherController teacherController;
+    private MyTestsPanel myTestsPanel;
+    private ResultsViewPanel resultsPanel;
     private TakerController takerController;
 
     public MainWindow(User user) {
@@ -26,8 +28,6 @@ public class MainWindow extends JFrame {
         initComponents();
         setupLayout();
         setupMenu();
-
-        tabbedPane = new JTabbedPane();
 
         if (currentUser.getRole().equals("ADMIN")) {
             setupAdminPanels();
@@ -181,17 +181,26 @@ public class MainWindow extends JFrame {
     private void setupTeacherPanels() {
         contentPanel.removeAll();
 
-        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane = new JTabbedPane();
 
         // Панель "Мои тесты"
-        MyTestsPanel myTestsPanel = new MyTestsPanel(teacherController);
+        myTestsPanel = new MyTestsPanel(teacherController);
+
+        // НАСТРАИВАЕМ ЛИСТЕНЕР ДЛЯ ПЕРЕХОДА К РЕЗУЛЬТАТАМ
+        myTestsPanel.setOnTestSelectedListener((testId, testName) -> {
+            // Переключаемся на вкладку результатов
+            if (resultsPanel != null) {
+                resultsPanel.selectTest(testId, testName);
+                tabbedPane.setSelectedComponent(resultsPanel);
+            }
+        });
+
         tabbedPane.addTab("📋 Мои тесты", myTestsPanel);
 
         // Панель "Результаты"
-        ResultsViewPanel resultsPanel = new ResultsViewPanel(teacherController);
+        resultsPanel = new ResultsViewPanel(teacherController);
         tabbedPane.addTab("📊 Результаты", resultsPanel);
 
-        // Панель "Назначения" (опционально, позже)
         contentPanel.add(tabbedPane, BorderLayout.CENTER);
         contentPanel.revalidate();
         contentPanel.repaint();
@@ -206,7 +215,7 @@ public class MainWindow extends JFrame {
         AvailableTestsPanel availableTestsPanel = new AvailableTestsPanel(takerController);
         tabbedPane.addTab("📋 Доступные тесты", availableTestsPanel);
 
-        // Панель "Мои результаты" (позже)
+        // Панель "Мои результаты"
         MyResultsPanel myResultsPanel = new MyResultsPanel(takerController);
         tabbedPane.addTab("📊 Мои результаты", myResultsPanel);
 
