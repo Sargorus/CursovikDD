@@ -5,10 +5,10 @@ import main.java.com.psychotest.model.Test;
 import main.java.com.psychotest.model.User;
 import main.java.com.psychotest.service.ResultService;
 import main.java.com.psychotest.view.dialogs.ResultDetailDialog;
-
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.io.File;
 import java.util.List;
 
 public class ResultsViewPanel extends JPanel {
@@ -18,6 +18,9 @@ public class ResultsViewPanel extends JPanel {
     private DefaultTableModel tableModel;
     private JButton exportButton;
     private JButton viewDetailButton;
+    private JLabel currentTestLabel;  // ← ДЛЯ ОТОБРАЖЕНИЯ ВЫБРАННОГО ТЕСТА
+    private int preSelectedTestId = -1;  // ← ДЛЯ ПРЕДВАРИТЕЛЬНОГО ВЫБОРА
+    private String preSelectedTestName = "";
 
     public ResultsViewPanel(TeacherController controller) {
         this.controller = controller;
@@ -25,28 +28,59 @@ public class ResultsViewPanel extends JPanel {
         loadTests();
     }
 
+    // ПРЕДВАРИТЕЛЬНЫЙ ВЫБОРА ТЕСТА
+    public void selectTest(int testId, String testName) {
+        this.preSelectedTestId = testId;
+        this.preSelectedTestName = testName;
+        loadTests();
+        // Выбираем тест в комбобоксе
+        for (int i = 0; i < testCombo.getItemCount(); i++) {
+            Test test = testCombo.getItemAt(i);
+            if (test.getId() == testId) {
+                testCombo.setSelectedIndex(i);
+                break;
+            }
+        }
+    }
+
     private void initComponents() {
         setLayout(new BorderLayout(10, 10));
 
-        // Верхняя панель с выбором теста
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        topPanel.add(new JLabel("Выберите тест:"));
+        // Верхняя панель с выбором теста и информацией
+        JPanel topPanel = new JPanel(new BorderLayout(10, 5));
+        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
+
+        // Панель выбора теста
+        JPanel selectPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        selectPanel.add(new JLabel("Выберите тест:"));
         testCombo = new JComboBox<>();
         testCombo.setPreferredSize(new Dimension(300, 25));
-        testCombo.addActionListener(e -> loadResults());
-        topPanel.add(testCombo);
+        testCombo.addActionListener(e -> {
+            if (testCombo.getSelectedItem() != null) {
+                loadResults();
+            }
+        });
+        selectPanel.add(testCombo);
 
         JButton refreshButton = new JButton("🔄 Обновить");
         refreshButton.addActionListener(e -> {
             loadTests();
             loadResults();
         });
-        topPanel.add(refreshButton);
+        selectPanel.add(refreshButton);
+
+        topPanel.add(selectPanel, BorderLayout.WEST);
+
+        // НАДПИСЬ С ТЕКУЩИМ ТЕСТОМ
+        currentTestLabel = new JLabel("Текущий тест: не выбран");
+        currentTestLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        currentTestLabel.setForeground(new Color(70, 130, 200));
+        topPanel.add(currentTestLabel, BorderLayout.CENTER);
 
         add(topPanel, BorderLayout.NORTH);
 
         // Центральная панель - таблица результатов
-        String[] columns = {"ID", "ФИО", "Логин", "Дата прохождения", "Статус", "Результат"};
+        String[] columns = {"ID сессии", "ФИО", "Логин", "Дата прохождения", "Статус"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -61,10 +95,9 @@ public class ResultsViewPanel extends JPanel {
             exportButton.setEnabled(resultsTable.getSelectedRow() != -1);
         });
 
-        // Настройка ширины колонок
-        resultsTable.getColumnModel().getColumn(0).setMaxWidth(50);
+        resultsTable.getColumnModel().getColumn(0).setMaxWidth(80);
         resultsTable.getColumnModel().getColumn(2).setMaxWidth(120);
-        resultsTable.getColumnModel().getColumn(3).setMaxWidth(120);
+        resultsTable.getColumnModel().getColumn(3).setMaxWidth(150);
         resultsTable.getColumnModel().getColumn(4).setMaxWidth(100);
 
         JScrollPane scrollPane = new JScrollPane(resultsTable);
@@ -93,8 +126,9 @@ public class ResultsViewPanel extends JPanel {
         for (Test test : tests) {
             testCombo.addItem(test);
         }
-        if (tests.size() > 0) {
-            loadResults();
+
+        if (tests.isEmpty()) {
+            currentTestLabel.setText("Текущий тест: нет доступных тестов");
         }
     }
 
@@ -102,8 +136,12 @@ public class ResultsViewPanel extends JPanel {
         tableModel.setRowCount(0);
         Test selectedTest = (Test) testCombo.getSelectedItem();
         if (selectedTest == null) {
+            currentTestLabel.setText("Текущий тест: не выбран");
             return;
         }
+
+        // ОБНОВЛЯЕМ НАДПИСЬ
+        currentTestLabel.setText("Текущий тест: " + selectedTest.getName());
 
         List<ResultService.TestResult> results = controller.getResultsForTest(selectedTest.getId());
 
@@ -113,15 +151,13 @@ public class ResultsViewPanel extends JPanel {
                     result.getUserFullName(),
                     result.getUserLogin(),
                     result.getFormattedDate(),
-                    getStatusText(result.getStatus()),
-                    "-" // TODO: добавить краткий результат
+                    getStatusText(result.getStatus())
             };
             tableModel.addRow(row);
         }
 
         if (results.isEmpty()) {
-            tableModel.setRowCount(0);
-            tableModel.addRow(new Object[]{"", "Нет данных", "", "", "", ""});
+            tableModel.addRow(new Object[]{"", "Нет результатов", "", "", ""});
         }
     }
 
@@ -147,10 +183,8 @@ public class ResultsViewPanel extends JPanel {
         Test selectedTest = (Test) testCombo.getSelectedItem();
         String testName = selectedTest != null ? selectedTest.getName() : "Тест";
 
-        // Показываем индикатор загрузки
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
-        // Загружаем детали в отдельном потоке
         SwingWorker<ResultService.SessionDetail, Void> worker = new SwingWorker<>() {
             @Override
             protected ResultService.SessionDetail doInBackground() {
@@ -176,7 +210,7 @@ public class ResultsViewPanel extends JPanel {
                 } catch (Exception e) {
                     e.printStackTrace();
                     JOptionPane.showMessageDialog(ResultsViewPanel.this,
-                            "Ошибка при загрузке деталей: " + e.getMessage(),
+                            "Ошибка: " + e.getMessage(),
                             "Ошибка", JOptionPane.ERROR_MESSAGE);
                 }
             }
@@ -205,19 +239,18 @@ public class ResultsViewPanel extends JPanel {
         }
 
         JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setSelectedFile(new java.io.File("report.xlsx"));
+        fileChooser.setSelectedFile(new File("report.xlsx"));
         fileChooser.setDialogTitle("Сохранить отчёт как...");
 
         if (fileChooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
             return;
         }
 
-        // ВСЕ ДАННЫЕ ДЛЯ ЭКСПОРТА СОБИРАЕМ ДО ЗАПУСКА SWINGWORKER
         String basePath = fileChooser.getSelectedFile().getAbsolutePath();
         String finalPath = basePath.endsWith(".xlsx") ? basePath : basePath + ".xlsx";
         int sessionId = (int) tableModel.getValueAt(selectedRow, 0);
         Test selectedTest = (Test) testCombo.getSelectedItem();
-        int exportOption = option; // сохраняем option в final переменную
+        int exportOption = option;
 
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
@@ -258,6 +291,4 @@ public class ResultsViewPanel extends JPanel {
         };
         worker.execute();
     }
-
-
 }
