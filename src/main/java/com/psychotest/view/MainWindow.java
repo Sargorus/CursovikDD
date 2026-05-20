@@ -22,6 +22,8 @@ public class MainWindow extends JFrame {
     private MyTestsPanel myTestsPanel;
     private ResultsViewPanel resultsPanel;
     private TakerController takerController;
+    private ParticipantsPanel participantsPanel;
+    private UserTestsPanel userTestsPanel;
 
     public MainWindow(User user) {
         this.currentUser = user;
@@ -181,27 +183,47 @@ public class MainWindow extends JFrame {
     private void setupTeacherPanels() {
         contentPanel.removeAll();
 
-        tabbedPane = new JTabbedPane();
+        JTabbedPane mainTabbedPane = new JTabbedPane();
 
-        // Панель "Мои тесты"
+        // Вкладка "Мои тесты"
         myTestsPanel = new MyTestsPanel(teacherController);
-
-        // НАСТРАИВАЕМ ЛИСТЕНЕР ДЛЯ ПЕРЕХОДА К РЕЗУЛЬТАТАМ
         myTestsPanel.setOnTestSelectedListener((testId, testName) -> {
-            // Переключаемся на вкладку результатов
             if (resultsPanel != null) {
                 resultsPanel.selectTest(testId, testName);
-                tabbedPane.setSelectedComponent(resultsPanel);
+                // Переключаемся на вкладку результатов
+                for (int i = 0; i < mainTabbedPane.getTabCount(); i++) {
+                    if (mainTabbedPane.getComponentAt(i) == resultsPanel) {
+                        mainTabbedPane.setSelectedIndex(i);
+                        break;
+                    }
+                }
             }
         });
+        mainTabbedPane.addTab("📋 Мои тесты", myTestsPanel);
 
-        tabbedPane.addTab("📋 Мои тесты", myTestsPanel);
+        // Вкладка "Участники" (новая)
+        ParticipantsPanel participantsPanel = new ParticipantsPanel(teacherController);
+        participantsPanel.setOnParticipantSelectedListener((userId, userName) -> {
+            userTestsPanel.setUser(userId, userName);
+            // Переключаемся на вкладку тестов участника
+            for (int i = 0; i < mainTabbedPane.getTabCount(); i++) {
+                if (mainTabbedPane.getComponentAt(i) == userTestsPanel) {
+                    mainTabbedPane.setSelectedIndex(i);
+                    break;
+                }
+            }
+        });
+        mainTabbedPane.addTab("👥 Участники", participantsPanel);
 
-        // Панель "Результаты"
+        // Вкладка "Тесты участника" (новая)
+        userTestsPanel = new UserTestsPanel(teacherController);
+        mainTabbedPane.addTab("📝 Тесты участника", userTestsPanel);
+
+        // Вкладка "Результаты"
         resultsPanel = new ResultsViewPanel(teacherController);
-        tabbedPane.addTab("📊 Результаты", resultsPanel);
+        mainTabbedPane.addTab("📊 Результаты", resultsPanel);
 
-        contentPanel.add(tabbedPane, BorderLayout.CENTER);
+        contentPanel.add(mainTabbedPane, BorderLayout.CENTER);
         contentPanel.revalidate();
         contentPanel.repaint();
     }

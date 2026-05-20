@@ -123,4 +123,30 @@ public class TestSessionDAO {
         }
         return sessions;
     }
+
+    /**
+     * Получить завершённые сессии пользователя
+     */
+    public List<TestSession> getCompletedSessionsForUser(int userId) throws SQLException {
+        List<TestSession> sessions = new ArrayList<>();
+        String sql = "SELECT * FROM test_sessions WHERE user_id = ? AND status = 'COMPLETED' ORDER BY end_time DESC";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                TestSession session = new TestSession();
+                session.setId(rs.getInt("id"));
+                session.setUserId(rs.getInt("user_id"));
+                session.setTestId(rs.getInt("test_id"));
+                session.setStartTime(rs.getTimestamp("start_time").toLocalDateTime());
+                if (rs.getTimestamp("end_time") != null) {
+                    session.setEndTime(rs.getTimestamp("end_time").toLocalDateTime());
+                }
+                session.setStatus(rs.getString("status"));
+                sessions.add(session);
+            }
+        }
+        return sessions;
+    }
 }
