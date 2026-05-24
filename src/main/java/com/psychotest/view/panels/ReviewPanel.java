@@ -52,7 +52,9 @@ public class ReviewPanel extends JPanel {
         sb.append("📋 ИНФОРМАЦИЯ О ТЕСТЕ\n");
         sb.append("─".repeat(50)).append("\n");
         sb.append("Название: ").append(controller.getTestName().isEmpty() ? "(не указано)" : controller.getTestName()).append("\n");
-        sb.append("Описание: ").append(controller.getTestDescription().isEmpty() ? "(не указано)" : controller.getTestDescription()).append("\n\n");
+        sb.append("Описание: ").append(controller.getTestDescription().isEmpty() ? "(не указано)" : controller.getTestDescription()).append("\n");
+        int qps = controller.getQuestionsPerSession();
+        sb.append("Вопросов в сессии: ").append(qps > 0 ? qps + " (случайная выборка)" : "Все вопросы").append("\n\n");
 
         // Шаг 2: Параметры
         sb.append("📊 ПАРАМЕТРЫ (шкалы)\n");
