@@ -94,8 +94,7 @@ public class MainWindowController {
     }
 
     private void showMyTests() {
-        // Открываем панель "Мои тесты"
-        window.setContentPanel(new AllTestsPanel(teacherController));
+        window.switchToTab(0); // Вкладка "Тесты"
     }
 
     private void showAssignTest() {
@@ -125,27 +124,17 @@ public class MainWindowController {
     }
 
     private void viewResults() {
-        // TODO: Открыть панель результатов
-        JOptionPane.showMessageDialog(window,
-                "Просмотр результатов будет реализован в следующей версии",
-                "В разработке",
-                JOptionPane.INFORMATION_MESSAGE);
+        window.switchToTab(3); // Вкладка "Результаты"
     }
 
     // ========== Методы для тестируемого ==========
 
     private void viewAvailableTests() {
-        JOptionPane.showMessageDialog(window,
-                "Доступные тесты будут отображаться здесь",
-                "Информация",
-                JOptionPane.INFORMATION_MESSAGE);
+        window.switchToTab(0); // Вкладка "Доступные тесты"
     }
 
     private void viewMyResults() {
-        JOptionPane.showMessageDialog(window,
-                "Ваши результаты будут отображаться здесь",
-                "Информация",
-                JOptionPane.INFORMATION_MESSAGE);
+        window.switchToTab(1); // Вкладка "Мои результаты"
     }
 
     // ========== Общие методы ==========
