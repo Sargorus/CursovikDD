@@ -103,6 +103,9 @@ public class TestConstructorDialog extends JDialog {
         saveDraftButton.addActionListener(e -> saveDraft());
         cancelButton.addActionListener(e -> cancel());
 
+        // В режиме редактирования черновик не нужен — скрываем кнопку
+        saveDraftButton.setVisible(!controller.isEditMode());
+
         // Стилизация кнопок
         styleButton(prevButton, new Color(100, 100, 100));
         styleButton(nextButton, new Color(70, 130, 200));
