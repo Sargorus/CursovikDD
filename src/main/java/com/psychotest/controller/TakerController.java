@@ -12,6 +12,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,14 +56,23 @@ public class TakerController {
     }
 
     /**
-     * Получить полное состояние теста для прохождения
+     * Получить полное состояние теста для прохождения.
+     * Если у теста задан лимит questionsPerSession > 0 и вопросов в банке больше,
+     * возвращает случайную выборку нужного размера.
      */
     public Test getFullTest(int testId) {
         try {
             Test test = testDAO.findById(testId);
             if (test != null) {
-                // Загружаем вопросы для теста
                 List<Question> questions = testDAO.loadQuestionsForTest(testId);
+
+                int limit = test.getQuestionsPerSession();
+                if (limit > 0 && questions.size() > limit) {
+                    // Случайная выборка без повторений
+                    Collections.shuffle(questions);
+                    questions = questions.subList(0, limit);
+                }
+
                 test.setQuestionBank(questions);
             }
             return test;

@@ -66,17 +66,20 @@ public class TestPersistenceService {
     }
 
     /**
-     * Назначает тест пользователю
+     * Назначает тест пользователю.
+     * dueDate может быть null (без срока).
      */
     public boolean assignTestToUser(int testId, int assignedBy, int userId, java.util.Date dueDate) throws SQLException {
-        return testDAO.assignToUser(testId, assignedBy, userId, new java.sql.Date(dueDate.getTime()));
+        return testDAO.assignToUser(testId, assignedBy, userId,
+                dueDate != null ? new java.sql.Date(dueDate.getTime()) : null);
     }
 
     /**
-     * Назначает тест группе
+     * Назначает тест группе.
+     * dueDate может быть null (без срока).
      */
     public boolean assignTestToGroup(int testId, int assignedBy, int groupId, java.util.Date dueDate) throws SQLException {
-        return testDAO.assignToGroup(testId, assignedBy, groupId, new java.sql.Date(dueDate.getTime()));
+        return testDAO.assignToGroup(testId, assignedBy, groupId, dueDate);
     }
 
     /**
