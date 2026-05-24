@@ -34,8 +34,22 @@ public class TestConstructorDialog extends JDialog {
     public TestConstructorDialog(Window parent, int teacherId) {
         super(parent, "Конструктор тестов", ModalityType.APPLICATION_MODAL);
         this.teacherId = teacherId;
-        this.controller = new TestConstructorController(teacherId);
         this.draftService = new TestDraftService();
+
+        // Если на диске есть старый черновик — спрашиваем пользователя
+        if (draftService.hasDraft(teacherId)) {
+            int choice = JOptionPane.showConfirmDialog(
+                    parent,
+                    "Найден несохранённый черновик теста.\nПродолжить с черновиком?",
+                    "Черновик найден",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE);
+            if (choice != JOptionPane.YES_OPTION) {
+                draftService.clearDraft(teacherId);  // удаляем черновик, откроем пустой конструктор
+            }
+        }
+
+        this.controller = new TestConstructorController(teacherId);
 
         initComponents();
         setupAutoSave();
