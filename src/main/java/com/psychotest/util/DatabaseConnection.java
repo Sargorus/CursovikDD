@@ -3,6 +3,7 @@ package main.java.com.psychotest.util;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+// DbConfig находится в том же пакете — import не нужен
 
 public class DatabaseConnection {
     private static DatabaseConnection instance;
@@ -39,6 +40,16 @@ public class DatabaseConnection {
         Connection conn = DriverManager.getConnection(url, username, password);
         conn.setAutoCommit(true);
         return conn;
+    }
+
+    /**
+     * Применяет настройки из DbConfig.
+     * Вызывается из Main перед первым обращением к БД.
+     */
+    public void configure(DbConfig config) {
+        this.url      = config.buildUrl();
+        this.username = config.getDbUser();
+        this.password = config.getDbPassword();
     }
 
     public void setTestMode(boolean testMode) {

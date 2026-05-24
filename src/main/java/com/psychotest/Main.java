@@ -25,39 +25,80 @@ public class Main
 
 package main.java.com.psychotest;
 
+import main.java.com.psychotest.util.DatabaseConnection;
 import main.java.com.psychotest.util.DatabaseInitializer;
+import main.java.com.psychotest.util.DbConfig;
 import main.java.com.psychotest.view.EntryWindow;
+import main.java.com.psychotest.view.dialogs.DbSettingsDialog;
 import main.java.com.psychotest.controller.LoginController;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 
 public class Main {
     public static void main(String[] args) {
         System.out.println("PsychoTest v1.0 запуск...");
 
-        // Инициализация БД с тестовыми данными
+        // ── Шаг 1: Установка L&F до показа любых диалогов ──
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ignored) {}
+
+        // ── Шаг 2: Загружаем конфигурацию БД ──
+        DbConfig config = DbConfig.load();
+
+        if (config == null) {
+            // Первый запуск — файл настроек ещё не создан
+            config = showDbSettings(null,
+                    "Файл настроек не найден. Укажите параметры подключения к PostgreSQL.");
+            if (config == null) System.exit(0);
+        }
+
+        // ── Шаг 3: Применяем настройки и проверяем соединение ──
+        DatabaseConnection.getInstance().configure(config);
+
         try {
             DatabaseInitializer.initialize();
         } catch (Exception e) {
-            System.err.println("Ошибка инициализации БД: " + e.getMessage());
-            e.printStackTrace();
-            System.exit(1);
+            // Соединение не удалось — даём пользователю исправить настройки
+            String errMsg = "Не удалось подключиться к базе данных:\n" + e.getMessage();
+            System.err.println(errMsg);
+
+            config = showDbSettings(config, errMsg);
+            if (config == null) System.exit(0);
+
+            DatabaseConnection.getInstance().configure(config);
+            try {
+                DatabaseInitializer.initialize();
+            } catch (Exception e2) {
+                JOptionPane.showMessageDialog(null,
+                        "Ошибка инициализации БД:\n" + e2.getMessage(),
+                        "Критическая ошибка", JOptionPane.ERROR_MESSAGE);
+                System.exit(1);
+            }
         }
 
-        // Запускаем Swing-приложение в EDT
+        // ── Шаг 4: Запускаем главное окно ──
         SwingUtilities.invokeLater(() -> {
-            try {
-                // Установка системного Look and Feel
-                javax.swing.UIManager.setLookAndFeel(
-                        javax.swing.UIManager.getSystemLookAndFeelClassName()
-                );
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            // Создание окна входа и контроллера
             EntryWindow window = new EntryWindow();
             new LoginController(window);
             window.setVisible(true);
         });
+    }
+
+    /**
+     * Показывает диалог настройки БД синхронно (блокирует главный поток до закрытия).
+     * @return DbConfig если пользователь нажал "Сохранить и продолжить", null если "Выход"
+     */
+    private static DbConfig showDbSettings(DbConfig current, String errorMessage) {
+        DbConfig[] result = {null};
+        try {
+            SwingUtilities.invokeAndWait(() -> {
+                DbSettingsDialog dlg = new DbSettingsDialog(null, current, errorMessage);
+                dlg.setVisible(true);
+                result[0] = dlg.getResult();
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return result[0];
     }
 }
