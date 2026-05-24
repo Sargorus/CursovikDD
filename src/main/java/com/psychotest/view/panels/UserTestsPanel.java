@@ -72,14 +72,15 @@ public class UserTestsPanel extends JPanel {
         testsTable = new JTable(tableModel);
         testsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         testsTable.getSelectionModel().addListSelectionListener(e -> {
-            boolean hasSelection = testsTable.getSelectedRow() != -1;
+            int row = testsTable.getSelectedRow();
+            boolean rowIsReal = row != -1 && tableModel.getValueAt(row, 0) instanceof Integer;
             boolean isCompleted = false;
-            if (hasSelection) {
-                String status = (String) tableModel.getValueAt(testsTable.getSelectedRow(), 3);
+            if (rowIsReal) {
+                String status = (String) tableModel.getValueAt(row, 3);
                 isCompleted = "Завершён".equals(status);
             }
-            viewResultButton.setEnabled(hasSelection && isCompleted);
-            unassignButton.setEnabled(hasSelection && !isCompleted);
+            viewResultButton.setEnabled(rowIsReal && isCompleted);
+            unassignButton.setEnabled(rowIsReal && !isCompleted);
         });
 
         testsTable.getColumnModel().getColumn(0).setMaxWidth(50);
