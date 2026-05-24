@@ -90,7 +90,7 @@ public class UserDAO {
         return false;
     }
 
-    // Обновить пользователя
+    // Обновить пользователя (ФИО и роль)
     public boolean update(User user) {
         String sql = "UPDATE users SET full_name = ?, role = ? WHERE id = ?";
 
@@ -100,6 +100,23 @@ public class UserDAO {
             pstmt.setString(1, user.getFullName());
             pstmt.setString(2, user.getRole());
             pstmt.setInt(3, user.getId());
+
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    // Обновить пароль пользователя
+    public boolean updatePassword(int id, String newPasswordHash) {
+        String sql = "UPDATE users SET password_hash = ? WHERE id = ?";
+
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, newPasswordHash);
+            pstmt.setInt(2, id);
 
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {

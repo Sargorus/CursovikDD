@@ -116,18 +116,17 @@ public class MainWindow extends JFrame {
         fileMenu.add(exitItem);
         menuBar.add(fileMenu);
 
-        // Аккаунт меню (для выхода из профиля)
+        // Аккаунт меню
         accountMenu = new JMenu("Аккаунт");
-        logoutItem = new JMenuItem("Выйти из профиля");
-        logoutItem.addActionListener(e -> logout());
-        accountMenu.add(logoutItem);
-        menuBar.add(accountMenu);
 
-        // Иформация о поьзователе в меню
         JMenuItem userInfoItem = new JMenuItem("Информация о пользователе");
         userInfoItem.addActionListener(e -> showUserInfo());
         accountMenu.add(userInfoItem);
+
         accountMenu.addSeparator();
+
+        logoutItem = new JMenuItem("Выйти из профиля");
+        logoutItem.addActionListener(e -> logout());
         accountMenu.add(logoutItem);
 
         menuBar.add(accountMenu);

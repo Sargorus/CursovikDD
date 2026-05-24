@@ -39,11 +39,11 @@ public class TeacherController {
     // ========== Управление тестами ==========
 
     /**
-     * Получить все тесты, созданные преподавателем
+     * Получить тесты, созданные этим преподавателем
      */
     public List<Test> getMyTests() {
         try {
-            return testDAO.findAll();
+            return testDAO.findByTeacher(teacherId);
         } catch (SQLException e) {
             e.printStackTrace();
             return new ArrayList<>();

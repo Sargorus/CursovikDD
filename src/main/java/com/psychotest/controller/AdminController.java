@@ -50,12 +50,7 @@ public class AdminController {
     }
 
     public boolean updateUserPassword(int id, String newPasswordHash) {
-        User user = userDAO.findById(id);
-        if (user != null) {
-            user.setPasswordHash(newPasswordHash);
-            return userDAO.update(user);
-        }
-        return false;
+        return userDAO.updatePassword(id, newPasswordHash);
     }
 
     public boolean deleteUser(int id) {
