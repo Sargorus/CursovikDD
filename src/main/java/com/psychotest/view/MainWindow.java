@@ -119,7 +119,6 @@ public class MainWindow extends JFrame {
         fileMenu.addSeparator();
 
         exitItem = new JMenuItem("Выход из приложения");
-        exitItem.addActionListener(e -> exitApplication());
         fileMenu.add(exitItem);
         menuBar.add(fileMenu);
 
