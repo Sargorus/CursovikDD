@@ -75,10 +75,18 @@ public class QuestionsPanel extends JPanel {
         addButton.addActionListener(e -> addQuestion());
 
         JButton editButton = new JButton("✏️ Редактировать");
+        editButton.setEnabled(false);
         editButton.addActionListener(e -> editQuestion());
 
         JButton removeButton = new JButton("➖ Удалить вопрос");
+        removeButton.setEnabled(false);
         removeButton.addActionListener(e -> removeQuestion());
+
+        questionsTable.getSelectionModel().addListSelectionListener(e -> {
+            boolean selected = questionsTable.getSelectedRow() != -1;
+            editButton.setEnabled(selected);
+            removeButton.setEnabled(selected);
+        });
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);

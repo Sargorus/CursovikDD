@@ -236,7 +236,10 @@ public class ResultDetailDialog extends JDialog {
             if (pr.getInterpretedCode() != null && !pr.getInterpretedCode().isEmpty()) {
                 sb.append("   Код: ").append(pr.getInterpretedCode()).append("\n");
             }
-            sb.append("   ").append(pr.getInterpretationText()).append("\n");
+            String interpText = pr.getInterpretationText();
+            if (interpText != null && !interpText.isEmpty()) {
+                sb.append("   ").append(interpText).append("\n");
+            }
             sb.append("\n");
         }
 
