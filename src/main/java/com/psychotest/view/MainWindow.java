@@ -222,7 +222,7 @@ public class MainWindow extends JFrame {
         tabbedPane.addTab("📁 Группы", groupsPanel);
 
         // "ТЕСТЫ" (для администратора)
-        AllTestsPanel testsPanel = new AllTestsPanel();  // конструктор без параметров для админа
+        AllTestsPanel testsPanel = new AllTestsPanel(adminController);
         tabbedPane.addTab("📋 Тесты", testsPanel);
 
         contentPanel.add(tabbedPane, BorderLayout.CENTER);

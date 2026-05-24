@@ -198,10 +198,11 @@ public class GroupDAO {
         return false;
     }
 
-    // Получить участников группы
+    // Получить участников группы (один JOIN-запрос вместо N+1)
     private List<User> getGroupMembers(int groupId) {
         List<User> members = new ArrayList<>();
-        String sql = "SELECT u.* FROM users u " +
+        String sql = "SELECT u.id, u.username, u.password_hash, u.full_name, u.role, u.created_at " +
+                "FROM users u " +
                 "JOIN user_groups ug ON u.id = ug.user_id " +
                 "WHERE ug.group_id = ? ORDER BY u.full_name";
 
@@ -211,9 +212,17 @@ public class GroupDAO {
             pstmt.setInt(1, groupId);
             ResultSet rs = pstmt.executeQuery();
 
-            UserDAO userDAO = new UserDAO();
             while (rs.next()) {
-                members.add(userDAO.findById(rs.getInt("id")));
+                User user = new User();
+                user.setId(rs.getInt("id"));
+                user.setUsername(rs.getString("username"));
+                user.setPasswordHash(rs.getString("password_hash"));
+                user.setFullName(rs.getString("full_name"));
+                user.setRole(rs.getString("role"));
+                if (rs.getTimestamp("created_at") != null) {
+                    user.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                }
+                members.add(user);
             }
         } catch (SQLException e) {
             e.printStackTrace();

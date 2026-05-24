@@ -1,24 +1,19 @@
 package main.java.com.psychotest.view.panels;
 
+import main.java.com.psychotest.controller.AdminController;
 import main.java.com.psychotest.controller.TeacherController;
-import main.java.com.psychotest.dao.TestDAO;
-import main.java.com.psychotest.dao.UserDAO;
 import main.java.com.psychotest.model.Test;
-import main.java.com.psychotest.model.User;
 import main.java.com.psychotest.view.dialogs.AssignTestDialog;
 import main.java.com.psychotest.view.dialogs.TestConstructorDialog;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.sql.SQLException;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 
 public class AllTestsPanel extends JPanel {
     private TeacherController controller;
-    private TestDAO testDAO;
-    private UserDAO userDAO;
+    private AdminController adminController;
     private JTable testsTable;
     private DefaultTableModel tableModel;
     private JTextField searchField;
@@ -37,18 +32,14 @@ public class AllTestsPanel extends JPanel {
     // Конструктор для преподавателя
     public AllTestsPanel(TeacherController controller) {
         this.controller = controller;
-        this.testDAO = new TestDAO();
-        this.userDAO = new UserDAO();
         this.isAdmin = false;
         initComponents();
         loadTests();
     }
 
     // Конструктор для администратора
-    public AllTestsPanel() {
-        this.controller = null;
-        this.testDAO = new TestDAO();
-        this.userDAO = new UserDAO();
+    public AllTestsPanel(AdminController adminController) {
+        this.adminController = adminController;
         this.isAdmin = true;
         initComponents();
         loadTestsForAdmin();
@@ -166,28 +157,12 @@ public class AllTestsPanel extends JPanel {
         tableModel.setRowCount(0);
 
         boolean showAll = filterCombo != null && "Все тесты".equals(filterCombo.getSelectedItem());
-        List<Test> tests = new ArrayList<>();
-
-        if (showAll) {
-            try {
-                tests = testDAO.findAll();
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-        } else {
-            tests = controller.getMyTests();
-        }
+        List<Test> tests = showAll ? controller.getAllTests() : controller.getMyTests();
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
         for (Test test : tests) {
-            String authorName;
-            if (showAll) {
-                authorName = getAuthorName(test.getCreatedBy());
-            } else {
-                authorName = "Я";
-            }
-
+            String authorName = showAll ? controller.getAuthorName(test.getCreatedBy()) : "Я";
             Object[] row = {
                     test.getId(),
                     test.getName(),
@@ -208,18 +183,11 @@ public class AllTestsPanel extends JPanel {
     private void loadTestsForAdmin() {
         tableModel.setRowCount(0);
 
-        List<Test> tests;
-        try {
-            tests = testDAO.findAll();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            tests = new ArrayList<>();
-        }
-
+        List<Test> tests = adminController.getAllTests();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
         for (Test test : tests) {
-            String authorName = getAuthorName(test.getCreatedBy());
+            String authorName = adminController.getAuthorName(test.getCreatedBy());
             Object[] row = {
                     test.getId(),
                     test.getName(),
@@ -242,7 +210,6 @@ public class AllTestsPanel extends JPanel {
 
         if (isAdmin) {
             loadTestsForAdmin();
-            // Фильтруем по поиску
             if (!searchText.isEmpty()) {
                 for (int i = tableModel.getRowCount() - 1; i >= 0; i--) {
                     String name = (String) tableModel.getValueAt(i, 1);
@@ -253,29 +220,24 @@ public class AllTestsPanel extends JPanel {
             }
         } else {
             boolean showAll = filterCombo != null && "Все тесты".equals(filterCombo.getSelectedItem());
-            List<Test> tests = new ArrayList<>();
+            List<Test> tests;
 
             if (showAll) {
-                try {
-                    tests = testDAO.findAll();
-                } catch (SQLException e) {
-                    e.printStackTrace();
+                tests = controller.getAllTests();
+                if (!searchText.isEmpty()) {
+                    tests = tests.stream()
+                            .filter(t -> t.getName().toLowerCase().contains(searchText))
+                            .toList();
                 }
             } else {
                 tests = controller.searchMyTests(searchText);
-            }
-
-            if (showAll && !searchText.isEmpty()) {
-                tests = tests.stream()
-                        .filter(t -> t.getName().toLowerCase().contains(searchText))
-                        .toList();
             }
 
             tableModel.setRowCount(0);
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
             for (Test test : tests) {
-                String authorName = showAll ? getAuthorName(test.getCreatedBy()) : "Я";
+                String authorName = showAll ? controller.getAuthorName(test.getCreatedBy()) : "Я";
                 Object[] row = {
                         test.getId(),
                         test.getName(),
@@ -290,16 +252,6 @@ public class AllTestsPanel extends JPanel {
             if (tests.isEmpty()) {
                 tableModel.addRow(new Object[]{"", "Нет тестов", "", "", "", ""});
             }
-        }
-    }
-
-    // Получить имя автора по ID
-    private String getAuthorName(int createdBy) {
-        try {
-            User user = userDAO.findById(createdBy);
-            return user != null ? user.getFullName() : "Неизвестный";
-        } catch (Exception e) {
-            return "Неизвестный";
         }
     }
 
@@ -421,12 +373,7 @@ public class AllTestsPanel extends JPanel {
 
     // Удаление теста для администратора
     private boolean deleteTestAsAdmin(int testId) {
-        try {
-            return testDAO.delete(testId);
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
+        return adminController.deleteTest(testId);
     }
 
     // Обрезка длинных строк
