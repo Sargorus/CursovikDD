@@ -91,7 +91,9 @@ public class AvailableTestsPanel extends JPanel {
             return;
         }
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idVal = tableModel.getValueAt(selectedRow, 0);
+        if (!(idVal instanceof Integer)) return;
+        int testId = (int) idVal;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         // Подтверждение начала теста

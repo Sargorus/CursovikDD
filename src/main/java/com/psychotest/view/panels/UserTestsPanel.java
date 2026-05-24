@@ -230,7 +230,9 @@ public class UserTestsPanel extends JPanel {
         int selectedRow = testsTable.getSelectedRow();
         if (selectedRow == -1) return;
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValView = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValView instanceof Integer)) return;
+        int testId = (int) idValView;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         // Находим сессию с результатами
@@ -260,7 +262,9 @@ public class UserTestsPanel extends JPanel {
         int selectedRow = testsTable.getSelectedRow();
         if (selectedRow == -1) return;
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValUnassign = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValUnassign instanceof Integer)) return;
+        int testId = (int) idValUnassign;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         int confirm = JOptionPane.showConfirmDialog(this,

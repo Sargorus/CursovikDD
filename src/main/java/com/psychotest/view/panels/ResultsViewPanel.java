@@ -187,7 +187,9 @@ public class ResultsViewPanel extends JPanel {
             return;
         }
 
-        int sessionId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValDetail = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValDetail instanceof Integer)) return;
+        int sessionId = (int) idValDetail;
         String userName = (String) tableModel.getValueAt(selectedRow, 1);
 
         Test selectedTest = (Test) testCombo.getSelectedItem();
@@ -263,7 +265,12 @@ public class ResultsViewPanel extends JPanel {
 
         String basePath = fileChooser.getSelectedFile().getAbsolutePath();
         String finalPath = basePath.endsWith(".xlsx") ? basePath : basePath + ".xlsx";
-        int sessionId = (selectedRow >= 0) ? (int) tableModel.getValueAt(selectedRow, 0) : -1;
+        // Если выбрана строка-заглушка (ID не Integer) — сбрасываем выбор
+        boolean rowIsReal = selectedRow >= 0 && tableModel.getValueAt(selectedRow, 0) instanceof Integer;
+        if (!rowIsReal && option != 0) {
+            option = 0; // принудительно экспортируем весь тест
+        }
+        int sessionId = rowIsReal ? (int) tableModel.getValueAt(selectedRow, 0) : -1;
         int exportOption = option;
 
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));

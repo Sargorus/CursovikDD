@@ -280,7 +280,9 @@ public class AllTestsPanel extends JPanel {
             return;
         }
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValEdit = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValEdit instanceof Integer)) return;
+        int testId = (int) idValEdit;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         // Загружаем полное состояние теста из БД
@@ -326,7 +328,9 @@ public class AllTestsPanel extends JPanel {
             return;
         }
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValAssign = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValAssign instanceof Integer)) return;
+        int testId = (int) idValAssign;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         if (isAdmin) {
@@ -352,7 +356,9 @@ public class AllTestsPanel extends JPanel {
             return;
         }
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValResults = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValResults instanceof Integer)) return;
+        int testId = (int) idValResults;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         if (listener != null) {
@@ -368,7 +374,9 @@ public class AllTestsPanel extends JPanel {
             return;
         }
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValDelete = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValDelete instanceof Integer)) return;
+        int testId = (int) idValDelete;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         int confirm = JOptionPane.showConfirmDialog(this,
