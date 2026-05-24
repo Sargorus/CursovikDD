@@ -4,13 +4,11 @@ import main.java.com.psychotest.controller.TestConstructorController;
 import main.java.com.psychotest.model.AnswerOption;
 import main.java.com.psychotest.model.Parameter;
 import main.java.com.psychotest.model.Question;
+import main.java.com.psychotest.view.dialogs.QuestionEditorDialog;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class QuestionsPanel extends JPanel {
     private TestConstructorController controller;
@@ -145,221 +143,27 @@ public class QuestionsPanel extends JPanel {
     }
 
     private void addQuestion() {
-        JTextField questionField = new JTextField(30);
-        JSpinner answerCountSpinner = new JSpinner(new SpinnerNumberModel(2, 2, 10, 1));
-
-        JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        panel.add(new JLabel("Текст вопроса:"), gbc);
-        gbc.gridx = 1;
-        panel.add(questionField, gbc);
-
-        gbc.gridx = 0;
-        gbc.gridy = 1;
-        panel.add(new JLabel("Количество ответов (2-10):"), gbc);
-        gbc.gridx = 1;
-        panel.add(answerCountSpinner, gbc);
-
-        int result = JOptionPane.showConfirmDialog(this, panel,
-                "Новый вопрос", JOptionPane.OK_CANCEL_OPTION);
-
-        if (result == JOptionPane.OK_OPTION) {
-            String questionText = questionField.getText().trim();
-            if (questionText.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Введите текст вопроса!");
-                return;
-            }
-
-            int numAnswers = (int) answerCountSpinner.getValue();
-            List<TestConstructorController.AnswerOptionData> answers = new ArrayList<>();
-
-            // Добавляем ответы
-            for (int i = 0; i < numAnswers; i++) {
-                TestConstructorController.AnswerOptionData answerData = addAnswerToQuestion(i + 1);
-                if (answerData != null) {
-                    answers.add(answerData);
-                } else {
-                    return; // пользователь отменил добавление ответа
-                }
-            }
-
-            if (!answers.isEmpty()) {
-                controller.addQuestion(questionText, answers);
-            }
+        QuestionEditorDialog dialog = new QuestionEditorDialog(
+                SwingUtilities.getWindowAncestor(this),
+                controller.getParameters());
+        dialog.setVisible(true);
+        if (dialog.isSaved()) {
+            controller.addQuestion(dialog.getQuestionText(), dialog.getAnswers());
         }
-    }
-
-    private TestConstructorController.AnswerOptionData addAnswerToQuestion(int answerNumber) {
-        JTextField answerField = new JTextField(30);
-
-        // Панель для влияния на параметры
-        List<Parameter> params = controller.getParameters();
-        JPanel impactsPanel = new JPanel(new GridLayout(params.size(), 2, 5, 5));
-        Map<Integer, JSpinner> impactSpinners = new HashMap<>();
-
-        for (int i = 0; i < params.size(); i++) {
-            Parameter param = params.get(i);
-            impactsPanel.add(new JLabel(param.getName() + ":"));
-            JSpinner spinner = new JSpinner(new SpinnerNumberModel(0, -10, 10, 1));
-            impactsPanel.add(spinner);
-            impactSpinners.put(i, spinner);
-        }
-
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.add(new JLabel("Вариант ответа #" + answerNumber + ":"), BorderLayout.NORTH);
-        panel.add(answerField, BorderLayout.CENTER);
-
-        if (!params.isEmpty()) {
-            JPanel impactWrapper = new JPanel(new BorderLayout());
-            impactWrapper.setBorder(BorderFactory.createTitledBorder("Влияние на параметры"));
-            impactWrapper.add(impactsPanel, BorderLayout.CENTER);
-            panel.add(impactWrapper, BorderLayout.SOUTH);
-        }
-
-        int result = JOptionPane.showConfirmDialog(this, panel,
-                "Добавление ответа", JOptionPane.OK_CANCEL_OPTION);
-
-        if (result == JOptionPane.OK_OPTION) {
-            String answerText = answerField.getText().trim();
-            if (answerText.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Введите текст ответа!");
-                return null;
-            }
-
-            TestConstructorController.AnswerOptionData data =
-                    new TestConstructorController.AnswerOptionData(answerText, answerNumber - 1);
-
-            // Добавляем влияния
-            for (var entry : impactSpinners.entrySet()) {
-                int paramIndex = entry.getKey();
-                int delta = (int) entry.getValue().getValue();
-                if (delta != 0) {
-                    data.addImpact(paramIndex, delta);
-                }
-            }
-            return data;
-        }
-        return null;
     }
 
     private void editQuestion() {
         int row = questionsTable.getSelectedRow();
-        if (row == -1) {
-            JOptionPane.showMessageDialog(this, "Выберите вопрос для редактирования!");
-            return;
+        if (row == -1) return;
+
+        QuestionEditorDialog dialog = new QuestionEditorDialog(
+                SwingUtilities.getWindowAncestor(this),
+                controller.getParameters(),
+                controller.getQuestion(row));
+        dialog.setVisible(true);
+        if (dialog.isSaved()) {
+            controller.updateQuestion(row, dialog.getQuestionText(), dialog.getAnswers());
         }
-
-        Question question = controller.getQuestion(row);
-        List<AnswerOption> existingOptions = question.getAnswerOptions();
-
-        // Шаг 1: текст вопроса и количество ответов
-        JTextField questionField = new JTextField(question.getText(), 30);
-        JSpinner answerCountSpinner = new JSpinner(
-                new SpinnerNumberModel(existingOptions.size(), 2, 10, 1));
-
-        JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-
-        gbc.gridx = 0; gbc.gridy = 0;
-        panel.add(new JLabel("Текст вопроса:"), gbc);
-        gbc.gridx = 1;
-        panel.add(questionField, gbc);
-
-        gbc.gridx = 0; gbc.gridy = 1;
-        panel.add(new JLabel("Количество ответов (2-10):"), gbc);
-        gbc.gridx = 1;
-        panel.add(answerCountSpinner, gbc);
-
-        int result = JOptionPane.showConfirmDialog(this, panel,
-                "Редактирование вопроса", JOptionPane.OK_CANCEL_OPTION);
-        if (result != JOptionPane.OK_OPTION) return;
-
-        String questionText = questionField.getText().trim();
-        if (questionText.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Введите текст вопроса!");
-            return;
-        }
-
-        int numAnswers = (int) answerCountSpinner.getValue();
-        List<TestConstructorController.AnswerOptionData> answers = new ArrayList<>();
-
-        // Шаг 2: редактируем каждый ответ с предзаполнением существующих данных
-        for (int i = 0; i < numAnswers; i++) {
-            AnswerOption existing = (i < existingOptions.size()) ? existingOptions.get(i) : null;
-            TestConstructorController.AnswerOptionData answerData = editAnswerOfQuestion(i + 1, existing);
-            if (answerData != null) {
-                answers.add(answerData);
-            } else {
-                return; // пользователь отменил
-            }
-        }
-
-        controller.updateQuestion(row, questionText, answers);
-    }
-
-    /** Диалог редактирования одного ответа с предзаполнением данных из existing (может быть null) */
-    private TestConstructorController.AnswerOptionData editAnswerOfQuestion(
-            int answerNumber, AnswerOption existing) {
-
-        String prefillText = (existing != null) ? existing.getText() : "";
-        JTextField answerField = new JTextField(prefillText, 30);
-
-        List<Parameter> params = controller.getParameters();
-        JPanel impactsPanel = new JPanel(new GridLayout(params.size(), 2, 5, 5));
-        Map<Integer, JSpinner> impactSpinners = new HashMap<>();
-
-        for (int i = 0; i < params.size(); i++) {
-            Parameter param = params.get(i);
-            impactsPanel.add(new JLabel(param.getName() + ":"));
-
-            int prefillValue = 0;
-            if (existing != null) {
-                Integer val = existing.getParameterImpacts().get(i);
-                if (val != null) prefillValue = val;
-            }
-            JSpinner spinner = new JSpinner(new SpinnerNumberModel(prefillValue, -10, 10, 1));
-            impactsPanel.add(spinner);
-            impactSpinners.put(i, spinner);
-        }
-
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.add(new JLabel("Вариант ответа #" + answerNumber + ":"), BorderLayout.NORTH);
-        panel.add(answerField, BorderLayout.CENTER);
-
-        if (!params.isEmpty()) {
-            JPanel impactWrapper = new JPanel(new BorderLayout());
-            impactWrapper.setBorder(BorderFactory.createTitledBorder("Влияние на параметры"));
-            impactWrapper.add(impactsPanel, BorderLayout.CENTER);
-            panel.add(impactWrapper, BorderLayout.SOUTH);
-        }
-
-        String title = (existing != null) ? "Редактирование ответа" : "Добавление ответа";
-        int result = JOptionPane.showConfirmDialog(this, panel, title, JOptionPane.OK_CANCEL_OPTION);
-
-        if (result == JOptionPane.OK_OPTION) {
-            String answerText = answerField.getText().trim();
-            if (answerText.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Введите текст ответа!");
-                return null;
-            }
-            TestConstructorController.AnswerOptionData data =
-                    new TestConstructorController.AnswerOptionData(answerText, answerNumber - 1);
-            for (var entry : impactSpinners.entrySet()) {
-                int delta = (int) entry.getValue().getValue();
-                if (delta != 0) {
-                    data.addImpact(entry.getKey(), delta);
-                }
-            }
-            return data;
-        }
-        return null;
     }
 
     private void removeQuestion() {
