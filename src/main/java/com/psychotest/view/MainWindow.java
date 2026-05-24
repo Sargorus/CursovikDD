@@ -12,8 +12,8 @@ public class MainWindow extends JFrame {
     private User currentUser;
     private JMenuBar menuBar;
     private JMenu fileMenu, testMenu, userMenu, reportMenu, accountMenu;
-    private JMenuItem exitItem, logoutItem, createTestItem, myTestsItem, assignTestItem,
-            viewResultsItem, manageUsersItem, manageGroupsItem;
+    private JMenuItem exitItem, logoutItem, changePasswordItem, createTestItem, myTestsItem,
+            assignTestItem, viewResultsItem, manageUsersItem, manageGroupsItem;
     private JLabel welcomeLabel;
     private JPanel contentPanel;
     private JTabbedPane tabbedPane;
@@ -111,6 +111,13 @@ public class MainWindow extends JFrame {
 
         // Файл меню
         fileMenu = new JMenu("Файл");
+
+        JMenuItem dbSettingsItem = new JMenuItem("🗄️ Настройки подключения к БД...");
+        dbSettingsItem.addActionListener(e -> showDbSettings());
+        fileMenu.add(dbSettingsItem);
+
+        fileMenu.addSeparator();
+
         exitItem = new JMenuItem("Выход из приложения");
         exitItem.addActionListener(e -> exitApplication());
         fileMenu.add(exitItem);
@@ -122,6 +129,9 @@ public class MainWindow extends JFrame {
         JMenuItem userInfoItem = new JMenuItem("Информация о пользователе");
         userInfoItem.addActionListener(e -> showUserInfo());
         accountMenu.add(userInfoItem);
+
+        changePasswordItem = new JMenuItem("Сменить пароль");
+        accountMenu.add(changePasswordItem);
 
         accountMenu.addSeparator();
 
@@ -262,6 +272,24 @@ public class MainWindow extends JFrame {
         }
     }
 
+    // Диалог настройки подключения к БД (из главного окна)
+    private void showDbSettings() {
+        main.java.com.psychotest.util.DbConfig current =
+                main.java.com.psychotest.util.DbConfig.load();
+        main.java.com.psychotest.view.dialogs.DbSettingsDialog dlg =
+                new main.java.com.psychotest.view.dialogs.DbSettingsDialog(this, current, null);
+        dlg.setVisible(true);
+
+        if (dlg.getResult() != null) {
+            main.java.com.psychotest.util.DatabaseConnection.getInstance()
+                    .configure(dlg.getResult());
+            JOptionPane.showMessageDialog(this,
+                    "Настройки сохранены.\nНовое подключение будет использоваться для следующих запросов.\n" +
+                    "Для полного применения перезапустите приложение.",
+                    "Настройки обновлены", JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+
     // Метод для отображения панелей преподавателя
     private void setupTeacherPanels() {
         contentPanel.removeAll();
@@ -337,6 +365,7 @@ public class MainWindow extends JFrame {
 
     public JMenuItem getExitItem() { return exitItem; }
     public JMenuItem getLogoutItem() { return logoutItem; }
+    public JMenuItem getChangePasswordItem() { return changePasswordItem; }
     public JMenuItem getCreateTestItem() { return createTestItem; }
     public JMenuItem getMyTestsItem() { return myTestsItem; }
     public JMenuItem getAssignTestItem() { return assignTestItem; }

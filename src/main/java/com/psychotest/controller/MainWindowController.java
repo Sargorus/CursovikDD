@@ -1,17 +1,19 @@
 package main.java.com.psychotest.controller;
 
+import main.java.com.psychotest.model.Test;
 import main.java.com.psychotest.model.User;
+import main.java.com.psychotest.service.AuthService;
 import main.java.com.psychotest.view.MainWindow;
 import main.java.com.psychotest.view.dialogs.AssignTestDialog;
-import main.java.com.psychotest.view.panels.AllTestsPanel;
-import main.java.com.psychotest.model.Test;
-import javax.swing.JOptionPane;
+import javax.swing.*;
+import java.awt.*;
 import java.util.List;
 
 public class MainWindowController {
-    private MainWindow window;
-    private User currentUser;
-    private TeacherController teacherController;  // ← ДОБАВЬТЕ ЭТО ПОЛЕ
+    private final MainWindow window;
+    private final User currentUser;
+    private final TeacherController teacherController;
+    private final AuthService authService = new AuthService();
 
     public MainWindowController(MainWindow window, User user) {
         this.window = window;
@@ -52,14 +54,10 @@ public class MainWindowController {
         if (window.getExitItem() != null) {
             window.getExitItem().addActionListener(e -> exit());
         }
-    }
 
-    private String getRoleName(String role) {
-        switch (role) {
-            case "ADMIN": return "Администратор";
-            case "TEACHER": return "Преподаватель";
-            case "TAKER": return "Тестируемый";
-            default: return role;
+        // Смена пароля — общий для всех ролей
+        if (window.getChangePasswordItem() != null) {
+            window.getChangePasswordItem().addActionListener(e -> changePassword());
         }
     }
 
@@ -116,6 +114,49 @@ public class MainWindowController {
     }
 
     // ========== Общие методы ==========
+
+    private void changePassword() {
+        JPasswordField currentField = new JPasswordField(20);
+        JPasswordField newField     = new JPasswordField(20);
+        JPasswordField confirmField = new JPasswordField(20);
+
+        JPanel panel = new JPanel(new GridLayout(0, 2, 8, 8));
+        panel.add(new JLabel("Текущий пароль:"));
+        panel.add(currentField);
+        panel.add(new JLabel("Новый пароль:"));
+        panel.add(newField);
+        panel.add(new JLabel("Подтвердите новый пароль:"));
+        panel.add(confirmField);
+
+        int result = JOptionPane.showConfirmDialog(window, panel,
+                "Смена пароля", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (result != JOptionPane.OK_OPTION) return;
+
+        String current = new String(currentField.getPassword());
+        String newPass  = new String(newField.getPassword());
+        String confirm  = new String(confirmField.getPassword());
+
+        if (newPass.length() < 4) {
+            JOptionPane.showMessageDialog(window,
+                    "Новый пароль должен содержать не менее 4 символов!",
+                    "Ошибка", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if (!newPass.equals(confirm)) {
+            JOptionPane.showMessageDialog(window,
+                    "Пароли не совпадают!", "Ошибка", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        boolean success = authService.changePassword(currentUser.getId(), current, newPass);
+        if (success) {
+            JOptionPane.showMessageDialog(window,
+                    "Пароль успешно изменён!", "Успех", JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(window,
+                    "Текущий пароль введён неверно!", "Ошибка", JOptionPane.ERROR_MESSAGE);
+        }
+    }
 
     private void exit() {
         int confirm = JOptionPane.showConfirmDialog(window,
