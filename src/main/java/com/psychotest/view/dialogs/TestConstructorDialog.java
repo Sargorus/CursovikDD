@@ -294,12 +294,15 @@ public class TestConstructorDialog extends JDialog {
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                autoSaveTimer.stop();
-                // Последнее автосохранение перед закрытием
-                if (!controller.getTestName().isEmpty() ||
-                        !controller.getParameters().isEmpty() ||
-                        !controller.getQuestions().isEmpty()) {
-                    controller.saveDraft();
+                // autoSaveTimer == null в режиме редактирования (setupAutoSave не вызывается)
+                if (autoSaveTimer != null) {
+                    autoSaveTimer.stop();
+                    // Последнее автосохранение перед закрытием (только в режиме создания)
+                    if (!controller.getTestName().isEmpty() ||
+                            !controller.getParameters().isEmpty() ||
+                            !controller.getQuestions().isEmpty()) {
+                        controller.saveDraft();
+                    }
                 }
             }
         });

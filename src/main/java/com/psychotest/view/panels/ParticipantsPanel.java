@@ -83,7 +83,9 @@ public class ParticipantsPanel extends JPanel {
                 if (e.getClickCount() == 2) {  // двойной клик
                     int row = participantsTable.getSelectedRow();
                     if (row != -1 && listener != null) {
-                        int userId = (int) tableModel.getValueAt(row, 0);
+                        Object idValClick = tableModel.getValueAt(row, 0);
+                        if (!(idValClick instanceof Integer)) return;
+                        int userId = (int) idValClick;
                         String userName = (String) tableModel.getValueAt(row, 1);
                         listener.onParticipantSelected(userId, userName);
                     }
