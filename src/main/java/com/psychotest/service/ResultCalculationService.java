@@ -241,18 +241,6 @@ public class ResultCalculationService {
     }
 
     /**
-     * Найти бинарную интерпретацию
-     */
-    private String findBinaryInterpretation(Parameter param, String code) {
-        for (ParameterInterpretation interp : param.getInterpretations()) {
-            if (code.equals(interp.getBinaryValue())) {
-                return interp.getInterpretationText();
-            }
-        }
-        return "Нет интерпретации";
-    }
-
-    /**
      * Найти интерпретацию по диапазону
      */
     private String findRangeInterpretation(Parameter param, int score) {
