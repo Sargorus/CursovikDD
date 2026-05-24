@@ -1,5 +1,6 @@
 package main.java.com.psychotest.view.dialogs;
 
+import main.java.com.psychotest.service.ExcelReportService;
 import main.java.com.psychotest.service.ResultService;
 import javax.swing.*;
 import java.awt.*;
@@ -8,6 +9,7 @@ public class ResultDetailDialog extends JDialog {
     private ResultService.SessionDetail detail;
     private String userName;
     private String testName;
+    private ExcelReportService excelReportService = new ExcelReportService();
 
     public ResultDetailDialog(Window parent, ResultService.SessionDetail detail,
                               String userName, String testName) {
@@ -72,11 +74,19 @@ public class ResultDetailDialog extends JDialog {
             filePath += ".xlsx";
         }
 
-        // TODO: Вызвать экспорт через контроллер
-        JOptionPane.showMessageDialog(this,
-                "Экспорт детального отчёта будет реализован в следующей версии.\n" +
-                        "Пока что используйте экспорт из главного окна.",
-                "Информация", JOptionPane.INFORMATION_MESSAGE);
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+        boolean success = excelReportService.exportSessionDetailsToExcel(detail, userName, testName, filePath);
+        setCursor(Cursor.getDefaultCursor());
+
+        if (success) {
+            JOptionPane.showMessageDialog(this,
+                    "Отчёт успешно сохранён:\n" + filePath,
+                    "Экспорт завершён", JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(this,
+                    "Ошибка при сохранении файла!\nПроверьте права доступа и путь.",
+                    "Ошибка экспорта", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private JPanel createParametersPanel() {

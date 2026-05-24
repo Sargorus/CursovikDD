@@ -240,6 +240,25 @@ public class TeacherController {
         return teacherId;
     }
 
+    /**
+     * Загружает полное состояние теста из БД для редактирования
+     */
+    public TestState loadTestState(int testId) {
+        try {
+            return testDAO.loadFullTestState(testId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Заменяет содержимое существующего теста новым состоянием
+     */
+    public void updateTestContent(int testId, TestState state) throws SQLException {
+        testDAO.replaceTestContent(testId, state);
+    }
+
     // ========== Экспорт в Excel ==========
 
     /**

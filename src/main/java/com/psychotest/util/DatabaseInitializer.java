@@ -2,6 +2,7 @@ package main.java.com.psychotest.util;
 
 import main.java.com.psychotest.dao.UserDAO;
 import main.java.com.psychotest.model.User;
+import main.java.com.psychotest.util.PasswordUtil;
 
 public class DatabaseInitializer {
 
@@ -16,8 +17,7 @@ public class DatabaseInitializer {
                 // Создаем администратора по умолчанию
                 User admin = new User();
                 admin.setUsername("admin");
-                // Используем явно хэш для admin123
-                admin.setPasswordHash("$2a$12$e7wFzvJCURSlad64HjYOae05yj/GtIEEVLUxATQTzlJR0FUDN7fy2");
+                admin.setPasswordHash(PasswordUtil.hashPassword("admin123"));
                 admin.setFullName("System Administrator");
                 admin.setRole("ADMIN");
 

@@ -93,8 +93,8 @@ public class MyResultsPanel extends JPanel {
     }
 
     private String getTestName(int testId) {
-        // TODO: загружать название теста из БД
-        return "Тест #" + testId;
+        String name = controller.getTestName(testId);
+        return (name != null && !name.isEmpty()) ? name : "Тест #" + testId;
     }
 
     private String getStatusText(String status) {
