@@ -266,47 +266,35 @@ public class MainWindow extends JFrame {
     private void setupTeacherPanels() {
         contentPanel.removeAll();
 
-        JTabbedPane mainTabbedPane = new JTabbedPane();
+        tabbedPane = new JTabbedPane(); // используем поле класса
 
-        // Вкладка "Мои тесты"
+        // Вкладка 0: "Тесты"
         allTestsPanel = new AllTestsPanel(teacherController);
         allTestsPanel.setOnTestSelectedListener((testId, testName) -> {
             if (resultsPanel != null) {
                 resultsPanel.selectTest(testId, testName);
-                // Переключаемся на вкладку результатов
-                for (int i = 0; i < mainTabbedPane.getTabCount(); i++) {
-                    if (mainTabbedPane.getComponentAt(i) == resultsPanel) {
-                        mainTabbedPane.setSelectedIndex(i);
-                        break;
-                    }
-                }
+                switchToTab(3); // переключаемся на вкладку "Результаты"
             }
         });
-        mainTabbedPane.addTab("📋 Тесты", allTestsPanel);
+        tabbedPane.addTab("📋 Тесты", allTestsPanel);
 
-        // Вкладка "Участники" (новая)
-        ParticipantsPanel participantsPanel = new ParticipantsPanel(teacherController);
+        // Вкладка 1: "Участники"
+        participantsPanel = new ParticipantsPanel(teacherController);
         participantsPanel.setOnParticipantSelectedListener((userId, userName) -> {
             userTestsPanel.setUser(userId, userName);
-            // Переключаемся на вкладку тестов участника
-            for (int i = 0; i < mainTabbedPane.getTabCount(); i++) {
-                if (mainTabbedPane.getComponentAt(i) == userTestsPanel) {
-                    mainTabbedPane.setSelectedIndex(i);
-                    break;
-                }
-            }
+            switchToTab(2); // переключаемся на "Тесты участника"
         });
-        mainTabbedPane.addTab("👥 Участники", participantsPanel);
+        tabbedPane.addTab("👥 Участники", participantsPanel);
 
-        // Вкладка "Тесты участника" (новая)
+        // Вкладка 2: "Тесты участника"
         userTestsPanel = new UserTestsPanel(teacherController);
-        mainTabbedPane.addTab("📝 Тесты участника", userTestsPanel);
+        tabbedPane.addTab("📝 Тесты участника", userTestsPanel);
 
-        // Вкладка "Результаты"
+        // Вкладка 3: "Результаты"
         resultsPanel = new ResultsViewPanel(teacherController);
-        mainTabbedPane.addTab("📊 Результаты", resultsPanel);
+        tabbedPane.addTab("📊 Результаты", resultsPanel);
 
-        contentPanel.add(mainTabbedPane, BorderLayout.CENTER);
+        contentPanel.add(tabbedPane, BorderLayout.CENTER);
         contentPanel.revalidate();
         contentPanel.repaint();
     }
@@ -314,19 +302,26 @@ public class MainWindow extends JFrame {
     private void setupTakerPanels() {
         contentPanel.removeAll();
 
-        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane = new JTabbedPane(); // используем поле класса
 
-        // Панель "Доступные тесты"
+        // Вкладка 0: "Доступные тесты"
         AvailableTestsPanel availableTestsPanel = new AvailableTestsPanel(takerController);
         tabbedPane.addTab("📋 Доступные тесты", availableTestsPanel);
 
-        // Панель "Мои результаты"
+        // Вкладка 1: "Мои результаты"
         MyResultsPanel myResultsPanel = new MyResultsPanel(takerController);
         tabbedPane.addTab("📊 Мои результаты", myResultsPanel);
 
         contentPanel.add(tabbedPane, BorderLayout.CENTER);
         contentPanel.revalidate();
         contentPanel.repaint();
+    }
+
+    /** Переключает активную вкладку по индексу */
+    public void switchToTab(int index) {
+        if (tabbedPane != null && index >= 0 && index < tabbedPane.getTabCount()) {
+            tabbedPane.setSelectedIndex(index);
+        }
     }
 
     public void setContentComponent(Component component) {
