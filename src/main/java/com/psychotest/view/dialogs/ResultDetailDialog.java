@@ -69,24 +69,39 @@ public class ResultDetailDialog extends JDialog {
             return;
         }
 
-        String filePath = fileChooser.getSelectedFile().getAbsolutePath();
-        if (!filePath.endsWith(".xlsx")) {
-            filePath += ".xlsx";
-        }
+        String rawPath = fileChooser.getSelectedFile().getAbsolutePath();
+        final String filePath = rawPath.endsWith(".xlsx") ? rawPath : rawPath + ".xlsx";
 
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-        boolean success = excelReportService.exportSessionDetailsToExcel(detail, userName, testName, filePath);
-        setCursor(Cursor.getDefaultCursor());
 
-        if (success) {
-            JOptionPane.showMessageDialog(this,
-                    "Отчёт успешно сохранён:\n" + filePath,
-                    "Экспорт завершён", JOptionPane.INFORMATION_MESSAGE);
-        } else {
-            JOptionPane.showMessageDialog(this,
-                    "Ошибка при сохранении файла!\nПроверьте права доступа и путь.",
-                    "Ошибка экспорта", JOptionPane.ERROR_MESSAGE);
-        }
+        new SwingWorker<Boolean, Void>() {
+            @Override
+            protected Boolean doInBackground() {
+                return excelReportService.exportSessionDetailsToExcel(detail, userName, testName, filePath);
+            }
+
+            @Override
+            protected void done() {
+                setCursor(Cursor.getDefaultCursor());
+                try {
+                    boolean success = get();
+                    if (success) {
+                        JOptionPane.showMessageDialog(ResultDetailDialog.this,
+                                "Отчёт успешно сохранён:\n" + filePath,
+                                "Экспорт завершён", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(ResultDetailDialog.this,
+                                "Ошибка при сохранении файла!\nПроверьте права доступа и путь.",
+                                "Ошибка экспорта", JOptionPane.ERROR_MESSAGE);
+                    }
+                } catch (Exception e) {
+                    setCursor(Cursor.getDefaultCursor());
+                    JOptionPane.showMessageDialog(ResultDetailDialog.this,
+                            "Ошибка: " + e.getMessage(),
+                            "Ошибка экспорта", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
     }
 
     private JPanel createParametersPanel() {
