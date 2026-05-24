@@ -177,11 +177,14 @@ public class TestTakingDialog extends JDialog {
         prevButton.setEnabled(currentQuestionIndex > 0);
 
         // На последнем вопросе меняем текст кнопки "Далее" на "Завершить"
-        if (currentQuestionIndex == questions.size() - 1) {
+        // и скрываем отдельную кнопку finishButton, чтобы не было двух одинаковых
+        boolean isLastQuestion = currentQuestionIndex == questions.size() - 1;
+        if (isLastQuestion) {
             nextButton.setText("✅ Завершить");
         } else {
             nextButton.setText("Далее ▶");
         }
+        finishButton.setVisible(!isLastQuestion);
     }
 
     private void saveCurrentAnswer() {

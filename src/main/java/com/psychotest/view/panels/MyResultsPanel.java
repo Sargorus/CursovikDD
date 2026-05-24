@@ -248,7 +248,10 @@ public class MyResultsPanel extends JPanel {
                 String paramName = entry.getKey();
                 sb.append("📊 ").append(paramName).append(": ").append(entry.getValue()).append("\n");
                 if (result.getInterpretations() != null) {
-                    sb.append("   ").append(result.getInterpretations().get(paramName)).append("\n");
+                    String interp = result.getInterpretations().get(paramName);
+                    if (interp != null && !interp.isEmpty()) {
+                        sb.append("   ").append(interp).append("\n");
+                    }
                 }
                 sb.append("\n");
             }
