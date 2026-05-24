@@ -426,11 +426,91 @@ public class TestDAO {
     // ========== УДАЛЕНИЕ ==========
 
     public boolean delete(int testId) throws SQLException {
-        String sql = "DELETE FROM tests WHERE id = ?";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, testId);
-            return pstmt.executeUpdate() > 0;
+        Connection conn = null;
+        try {
+            conn = DatabaseConnection.getInstance().getConnection();
+            conn.setAutoCommit(false);
+
+            // 1. Удаляем результаты и ответы пользователей из сессий этого теста
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM test_results WHERE session_id IN " +
+                    "(SELECT id FROM test_sessions WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM user_answers WHERE session_id IN " +
+                    "(SELECT id FROM test_sessions WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 2. Удаляем сессии и назначения теста
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM test_sessions WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM test_assignments WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 3. Удаляем влияния → ответы → вопросы
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM answer_parameter_impact WHERE answer_option_id IN " +
+                    "(SELECT ao.id FROM answer_options ao JOIN questions q ON ao.question_id = q.id WHERE q.test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM answer_options WHERE question_id IN (SELECT id FROM questions WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM questions WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 4. Удаляем интерпретации → параметры
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM parameter_interpretations WHERE parameter_id IN " +
+                    "(SELECT id FROM parameters WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM parameters WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 5. Удаляем сам тест
+            int deleted;
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM tests WHERE id = ?")) {
+                pstmt.setInt(1, testId);
+                deleted = pstmt.executeUpdate();
+            }
+
+            conn.commit();
+            return deleted > 0;
+
+        } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
+            throw e;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException e) { e.printStackTrace(); }
+            }
         }
     }
 
