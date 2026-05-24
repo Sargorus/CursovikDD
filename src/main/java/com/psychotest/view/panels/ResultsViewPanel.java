@@ -59,6 +59,7 @@ public class ResultsViewPanel extends JPanel {
             if (testCombo.getSelectedItem() != null) {
                 loadResults();
             }
+            updateExportButton();
         });
         selectPanel.add(testCombo);
 
@@ -91,8 +92,11 @@ public class ResultsViewPanel extends JPanel {
         resultsTable = new JTable(tableModel);
         resultsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         resultsTable.getSelectionModel().addListSelectionListener(e -> {
-            viewDetailButton.setEnabled(resultsTable.getSelectedRow() != -1);
-            exportButton.setEnabled(resultsTable.getSelectedRow() != -1);
+            boolean hasRow = resultsTable.getSelectedRow() != -1;
+            viewDetailButton.setEnabled(hasRow);
+            // Экспорт всего теста доступен всегда; выбранная строка нужна только для "одного результата"
+            // Состояние кнопки обновляется через updateExportButton()
+            updateExportButton();
         });
 
         resultsTable.getColumnModel().getColumn(0).setMaxWidth(80);
@@ -111,7 +115,7 @@ public class ResultsViewPanel extends JPanel {
         viewDetailButton.addActionListener(e -> viewDetail());
 
         exportButton = new JButton("📊 Экспорт в Excel");
-        exportButton.setEnabled(false);
+        exportButton.setEnabled(false); // включается после выбора теста
         exportButton.addActionListener(e -> exportToExcel());
 
         buttonPanel.add(viewDetailButton);
@@ -132,9 +136,15 @@ public class ResultsViewPanel extends JPanel {
         }
     }
 
+    /** Включает кнопку экспорта если выбран тест; строка при этом не обязательна */
+    private void updateExportButton() {
+        exportButton.setEnabled(testCombo.getSelectedItem() != null);
+    }
+
     private void loadResults() {
         tableModel.setRowCount(0);
         Test selectedTest = (Test) testCombo.getSelectedItem();
+        updateExportButton();
         if (selectedTest == null) {
             currentTestLabel.setText("Текущий тест: не выбран");
             return;
@@ -219,23 +229,28 @@ public class ResultsViewPanel extends JPanel {
     }
 
     private void exportToExcel() {
-        int selectedRow = resultsTable.getSelectedRow();
-        if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this, "Выберите результат для экспорта!");
+        Test selectedTest = (Test) testCombo.getSelectedItem();
+        if (selectedTest == null) {
+            JOptionPane.showMessageDialog(this, "Выберите тест для экспорта!");
             return;
         }
 
-        int option = JOptionPane.showOptionDialog(this,
-                "Что вы хотите экспортировать?",
-                "Экспорт в Excel",
-                JOptionPane.YES_NO_CANCEL_OPTION,
-                JOptionPane.QUESTION_MESSAGE,
-                null,
-                new String[]{"Все результаты теста", "Только выбранный результат", "Отмена"},
-                "Все результаты теста");
+        int selectedRow = resultsTable.getSelectedRow();
+        int option;
 
-        if (option == 2 || option == JOptionPane.CLOSED_OPTION) {
-            return;
+        if (selectedRow == -1) {
+            // Строка не выбрана — только экспорт всего теста
+            option = 0;
+        } else {
+            option = JOptionPane.showOptionDialog(this,
+                    "Что вы хотите экспортировать?",
+                    "Экспорт в Excel",
+                    JOptionPane.YES_NO_CANCEL_OPTION,
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    new String[]{"Все результаты теста", "Только выбранный результат", "Отмена"},
+                    "Все результаты теста");
+            if (option == 2 || option == JOptionPane.CLOSED_OPTION) return;
         }
 
         JFileChooser fileChooser = new JFileChooser();
@@ -248,8 +263,7 @@ public class ResultsViewPanel extends JPanel {
 
         String basePath = fileChooser.getSelectedFile().getAbsolutePath();
         String finalPath = basePath.endsWith(".xlsx") ? basePath : basePath + ".xlsx";
-        int sessionId = (int) tableModel.getValueAt(selectedRow, 0);
-        Test selectedTest = (Test) testCombo.getSelectedItem();
+        int sessionId = (selectedRow >= 0) ? (int) tableModel.getValueAt(selectedRow, 0) : -1;
         int exportOption = option;
 
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
