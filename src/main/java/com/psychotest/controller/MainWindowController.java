@@ -22,14 +22,8 @@ public class MainWindowController {
 
     private void attachListeners() {
         // Обработчики для разных ролей
-        if (currentUser.getRole().equals("ADMIN")) {
-            if (window.getManageUsersItem() != null) {
-                window.getManageUsersItem().addActionListener(e -> manageUsers());
-            }
-            if (window.getManageGroupsItem() != null) {
-                window.getManageGroupsItem().addActionListener(e -> manageGroups());
-            }
-        }
+        // Для администратора слушатели меню уже установлены в MainWindow.setupAdminMenu()
+        // и setupAdminPanels() вызывается оттуда напрямую — дублировать здесь не нужно.
 
         if (currentUser.getRole().equals("TEACHER")) {
             if (window.getCreateTestItem() != null) {
@@ -67,22 +61,6 @@ public class MainWindowController {
             case "TAKER": return "Тестируемый";
             default: return role;
         }
-    }
-
-    // ========== Методы для администратора ==========
-
-    private void manageUsers() {
-        JOptionPane.showMessageDialog(window,
-                "Управление пользователями будет реализовано в следующей версии",
-                "В разработке",
-                JOptionPane.INFORMATION_MESSAGE);
-    }
-
-    private void manageGroups() {
-        JOptionPane.showMessageDialog(window,
-                "Управление группами будет реализовано в следующей версии",
-                "В разработке",
-                JOptionPane.INFORMATION_MESSAGE);
     }
 
     // ========== Методы для преподавателя ==========

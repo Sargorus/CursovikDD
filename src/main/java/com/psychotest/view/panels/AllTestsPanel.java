@@ -3,6 +3,7 @@ package main.java.com.psychotest.view.panels;
 import main.java.com.psychotest.controller.AdminController;
 import main.java.com.psychotest.controller.TeacherController;
 import main.java.com.psychotest.model.Test;
+import main.java.com.psychotest.model.TestState;
 import main.java.com.psychotest.view.dialogs.AssignTestDialog;
 import main.java.com.psychotest.view.dialogs.TestConstructorDialog;
 import javax.swing.*;
@@ -282,11 +283,39 @@ public class AllTestsPanel extends JPanel {
         int testId = (int) tableModel.getValueAt(selectedRow, 0);
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
-        JOptionPane.showMessageDialog(this,
-                "Редактирование теста \"" + testName + "\"\n\n" +
-                        "В текущей версии редактирование доступно только через создание копии.\n" +
-                        "Скопируйте тест и отредактируйте копию.",
-                "Информация", JOptionPane.INFORMATION_MESSAGE);
+        // Загружаем полное состояние теста из БД
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+        TestState state;
+        try {
+            if (isAdmin) {
+                state = adminController.loadTestState(testId);
+            } else {
+                state = controller.loadTestState(testId);
+            }
+        } finally {
+            setCursor(Cursor.getDefaultCursor());
+        }
+
+        if (state == null) {
+            JOptionPane.showMessageDialog(this,
+                    "Не удалось загрузить тест для редактирования!\nПроверьте подключение к БД.",
+                    "Ошибка", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // Определяем teacherId для конструктора
+        int teacherId = isAdmin ? 0 : controller.getTeacherId();
+
+        Window parentWindow = SwingUtilities.getWindowAncestor(this);
+        TestConstructorDialog dialog = new TestConstructorDialog(parentWindow, teacherId, testId, state);
+        dialog.setVisible(true);
+
+        // Обновляем список после редактирования
+        if (isAdmin) {
+            loadTestsForAdmin();
+        } else {
+            loadTests();
+        }
     }
 
     // Назначение теста

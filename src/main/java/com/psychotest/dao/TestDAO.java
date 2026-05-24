@@ -57,6 +57,7 @@ public class TestDAO {
             if (conn != null) {
                 try {
                     conn.setAutoCommit(true);
+                    conn.close();
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -332,6 +333,91 @@ public class TestDAO {
             pstmt.setInt(3, test.getQuestionsPerSession());
             pstmt.setInt(4, test.getId());
             return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    // ========== РЕДАКТИРОВАНИЕ (замена контента теста) ==========
+
+    /**
+     * Обновляет существующий тест: заменяет все параметры, вопросы, ответы и влияния.
+     * Запись test (name, description, questions_per_session) обновляется на месте,
+     * поэтому старые сессии/результаты, ссылающиеся на тот же testId, остаются валидными.
+     */
+    public void replaceTestContent(int testId, TestState state) throws SQLException {
+        Connection conn = null;
+        try {
+            conn = DatabaseConnection.getInstance().getConnection();
+            conn.setAutoCommit(false);
+
+            // 1. Обновляем базовые поля теста
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "UPDATE tests SET name = ?, description = ?, questions_per_session = ? WHERE id = ?")) {
+                pstmt.setString(1, state.getTestName());
+                pstmt.setString(2, state.getTestDescription());
+                pstmt.setInt(3, state.getQuestionsPerSession());
+                pstmt.setInt(4, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 2. Удаляем старые влияния → ответы → вопросы (через явный порядок)
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM answer_parameter_impact WHERE answer_option_id IN " +
+                    "(SELECT ao.id FROM answer_options ao JOIN questions q ON ao.question_id = q.id WHERE q.test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM answer_options WHERE question_id IN (SELECT id FROM questions WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement("DELETE FROM questions WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 3. Удаляем старые интерпретации → параметры
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM parameter_interpretations WHERE parameter_id IN " +
+                    "(SELECT id FROM parameters WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement("DELETE FROM parameters WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 4. Сохраняем новые параметры (получаем реальные ID)
+            List<Parameter> savedParams = state.getParameters();
+            for (Parameter param : savedParams) {
+                int paramId = saveParameter(conn, testId, param);
+                param.setId(paramId);
+            }
+
+            // 5. Сохраняем новые вопросы, ответы и влияния
+            for (Question question : state.getQuestions()) {
+                int questionId = saveQuestion(conn, testId, question);
+                for (AnswerOption option : question.getAnswerOptions()) {
+                    int optionId = saveAnswerOption(conn, questionId, option);
+                    saveImpacts(conn, optionId, option.getParameterImpacts(), savedParams);
+                }
+            }
+
+            conn.commit();
+
+        } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
+            throw e;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException e) { e.printStackTrace(); }
+            }
         }
     }
 

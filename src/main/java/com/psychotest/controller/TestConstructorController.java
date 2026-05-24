@@ -2,6 +2,7 @@ package main.java.com.psychotest.controller;
 
 import main.java.com.psychotest.exception.InvalidRangeException;
 import main.java.com.psychotest.model.*;
+import main.java.com.psychotest.dao.TestDAO;
 import main.java.com.psychotest.service.TestPersistenceService;
 import main.java.com.psychotest.service.TestValidationService;
 import main.java.com.psychotest.service.TestDraftService;
@@ -17,13 +18,33 @@ public class TestConstructorController {
     private TestValidationService validator;
     private TestDraftService draftService;
     private int teacherId;
+    /** ID редактируемого теста, или -1 если создаём новый */
+    private int editingTestId = -1;
     private List<ModelChangeListener> listeners = new ArrayList<>();
 
+    /** Конструктор для создания нового теста (загружает черновик при наличии) */
     public TestConstructorController(int teacherId) {
         this.teacherId = teacherId;
         this.validator = new TestValidationService();
         this.draftService = new TestDraftService();
         this.testState = draftService.loadLastDraft(teacherId);
+    }
+
+    /** Конструктор для редактирования существующего теста */
+    public TestConstructorController(int teacherId, int editingTestId, TestState existingState) {
+        this.teacherId = teacherId;
+        this.editingTestId = editingTestId;
+        this.validator = new TestValidationService();
+        this.draftService = new TestDraftService();
+        this.testState = existingState;
+    }
+
+    public boolean isEditMode() {
+        return editingTestId > 0;
+    }
+
+    public int getEditingTestId() {
+        return editingTestId;
     }
 
     // ========== Наблюдатель для обновления View ==========
@@ -175,10 +196,23 @@ public class TestConstructorController {
     }
 
     // ========== Сохранение в БД ==========
+
+    /**
+     * Сохраняет тест в БД.
+     * В режиме редактирования заменяет содержимое существующего теста и возвращает его ID.
+     * При создании нового — создаёт запись и возвращает новый ID.
+     */
     public int saveTestToDatabase() throws SQLException {
-        TestPersistenceService persistenceService = new TestPersistenceService();
-        int testId = persistenceService.saveTest(testState, teacherId);
-        draftService.clearDraft(teacherId);
-        return testId;
+        if (isEditMode()) {
+            TestDAO testDAO = new TestDAO();
+            testDAO.replaceTestContent(editingTestId, testState);
+            // В режиме редактирования черновик не трогаем
+            return editingTestId;
+        } else {
+            TestPersistenceService persistenceService = new TestPersistenceService();
+            int testId = persistenceService.saveTest(testState, teacherId);
+            draftService.clearDraft(teacherId);
+            return testId;
+        }
     }
 }
