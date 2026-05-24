@@ -15,6 +15,7 @@ public class AssignTestDialog extends JDialog {
 
     private JComboBox<Group> groupCombo;
     private JSpinner dateSpinner;
+    private JCheckBox noDueDateCheckBox;
     private boolean confirmed = false;
 
     public AssignTestDialog(Window parent, TeacherController controller, int testId, String testName) {
@@ -63,7 +64,7 @@ public class AssignTestDialog extends JDialog {
         // Дата выполнения
         gbc.gridx = 0;
         gbc.gridy = 1;
-        mainPanel.add(new JLabel("Дата выполнения (опционально):"), gbc);
+        mainPanel.add(new JLabel("Дата выполнения:"), gbc);
 
         gbc.gridx = 1;
         dateSpinner = new JSpinner(new SpinnerDateModel());
@@ -71,14 +72,16 @@ public class AssignTestDialog extends JDialog {
         dateSpinner.setEditor(dateEditor);
         mainPanel.add(dateSpinner, gbc);
 
-        // Подсказка
+        // Чекбокс "Без срока"
         gbc.gridx = 0;
         gbc.gridy = 2;
         gbc.gridwidth = 2;
-        JLabel hintLabel = new JLabel("Оставьте дату пустой, если тест без ограничения по времени");
-        hintLabel.setFont(new Font("Arial", Font.ITALIC, 11));
-        hintLabel.setForeground(Color.GRAY);
-        mainPanel.add(hintLabel, gbc);
+        noDueDateCheckBox = new JCheckBox("Без срока выполнения (тест доступен без ограничений)");
+        noDueDateCheckBox.setSelected(true); // по умолчанию — без срока
+        noDueDateCheckBox.addActionListener(e -> dateSpinner.setEnabled(!noDueDateCheckBox.isSelected()));
+        dateSpinner.setEnabled(false); // изначально спиннер отключён
+        mainPanel.add(noDueDateCheckBox, gbc);
+        gbc.gridwidth = 1;
 
         add(mainPanel, BorderLayout.CENTER);
 
@@ -103,7 +106,8 @@ public class AssignTestDialog extends JDialog {
             return;
         }
 
-        Date dueDate = (Date) dateSpinner.getValue();
+        // null если выбрано "Без срока", иначе — выбранная дата
+        Date dueDate = noDueDateCheckBox.isSelected() ? null : (Date) dateSpinner.getValue();
 
         boolean success = controller.assignTestToGroup(testId, selectedGroup.getId(), dueDate);
 

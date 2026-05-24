@@ -30,11 +30,16 @@ public class TestSessionDAO {
     }
 
     /**
-     * Сохранить ответ пользователя
+     * Сохранить (или обновить) ответ пользователя.
+     * Использует UPSERT: если ответ на этот вопрос уже есть — обновляет его.
+     * Это позволяет корректно сохранять изменённый ответ при возврате назад.
      */
     public void saveAnswer(int sessionId, int questionId, int answerOptionId) throws SQLException {
         String sql = "INSERT INTO user_answers (session_id, question_id, answer_option_id, answered_at) " +
-                "VALUES (?, ?, ?, CURRENT_TIMESTAMP)";
+                "VALUES (?, ?, ?, CURRENT_TIMESTAMP) " +
+                "ON CONFLICT (session_id, question_id) " +
+                "DO UPDATE SET answer_option_id = EXCLUDED.answer_option_id, " +
+                "answered_at = CURRENT_TIMESTAMP";
         try (Connection conn = DatabaseConnection.getInstance().getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, sessionId);

@@ -114,7 +114,8 @@ public class TeacherController {
      */
     public boolean assignTestToGroup(int testId, int groupId, Date dueDate) {
         try {
-            return testDAO.assignToGroup(testId, teacherId, groupId, new java.sql.Date(dueDate.getTime()));
+            // dueDate может быть null (без срока) — передаём как есть в DAO
+            return testDAO.assignToGroup(testId, teacherId, groupId, dueDate);
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
