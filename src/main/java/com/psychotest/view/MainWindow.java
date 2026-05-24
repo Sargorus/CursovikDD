@@ -224,7 +224,7 @@ public class MainWindow extends JFrame {
         JTabbedPane tabbedPane = new JTabbedPane();
 
         // Вкладка "Пользователи"
-        UsersPanel usersPanel = new UsersPanel(adminController);
+        UsersPanel usersPanel = new UsersPanel(adminController, currentUser.getId());
         tabbedPane.addTab("👥 Пользователи", usersPanel);
 
         // Вкладка "Группы"

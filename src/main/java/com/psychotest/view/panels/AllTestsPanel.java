@@ -107,11 +107,12 @@ public class AllTestsPanel extends JPanel {
         testsTable = new JTable(tableModel);
         testsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         testsTable.getSelectionModel().addListSelectionListener(e -> {
-            boolean hasSelection = testsTable.getSelectedRow() != -1;
-            if (editButton != null) editButton.setEnabled(hasSelection);
-            if (deleteButton != null) deleteButton.setEnabled(hasSelection);
-            if (assignButton != null) assignButton.setEnabled(hasSelection);
-            if (resultsButton != null) resultsButton.setEnabled(hasSelection);
+            int row = testsTable.getSelectedRow();
+            boolean rowIsReal = row != -1 && tableModel.getValueAt(row, 0) instanceof Integer;
+            if (editButton != null) editButton.setEnabled(rowIsReal);
+            if (deleteButton != null) deleteButton.setEnabled(rowIsReal);
+            if (assignButton != null) assignButton.setEnabled(rowIsReal);
+            if (resultsButton != null) resultsButton.setEnabled(rowIsReal);
         });
 
         testsTable.getColumnModel().getColumn(0).setMaxWidth(50);
