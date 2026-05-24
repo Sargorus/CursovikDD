@@ -69,10 +69,18 @@ public class ParametersPanel extends JPanel {
         addButton.addActionListener(e -> addParameter());
 
         JButton editButton = new JButton("✏️ Редактировать");
+        editButton.setEnabled(false);
         editButton.addActionListener(e -> editParameter());
 
         JButton removeButton = new JButton("➖ Удалить параметр");
+        removeButton.setEnabled(false);
         removeButton.addActionListener(e -> removeParameter());
+
+        paramsTable.getSelectionModel().addListSelectionListener(e -> {
+            boolean selected = paramsTable.getSelectedRow() != -1;
+            editButton.setEnabled(selected);
+            removeButton.setEnabled(selected);
+        });
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
@@ -216,9 +224,9 @@ public class ParametersPanel extends JPanel {
         buttonPanel.add(doneButton);
         panel.add(buttonPanel, BorderLayout.SOUTH);
 
-        JDialog dialog = new JDialog();
-        dialog.setTitle("Интерпретации для параметра");
-        dialog.setModal(true);
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this),
+                "Интерпретации для параметра",
+                java.awt.Dialog.ModalityType.APPLICATION_MODAL);
         dialog.setContentPane(panel);
         dialog.setSize(400, 400);
         dialog.setLocationRelativeTo(this);

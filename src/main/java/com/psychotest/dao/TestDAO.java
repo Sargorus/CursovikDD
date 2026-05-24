@@ -183,7 +183,9 @@ public class TestDAO {
                 test.setName(rs.getString("name"));
                 test.setDescription(rs.getString("description"));
                 test.setCreatedBy(rs.getInt("created_by"));
-                test.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                if (rs.getTimestamp("created_at") != null) {
+                    test.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                }
                 test.setQuestionsPerSession(rs.getInt("questions_per_session"));
                 return test;
             }
@@ -447,7 +449,9 @@ public class TestDAO {
                 test.setName(rs.getString("name"));
                 test.setDescription(rs.getString("description"));
                 test.setCreatedBy(rs.getInt("created_by"));
-                test.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                if (rs.getTimestamp("created_at") != null) {
+                    test.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                }
                 test.setQuestionsPerSession(rs.getInt("questions_per_session"));
                 tests.add(test);
             }
@@ -467,7 +471,9 @@ public class TestDAO {
                 test.setName(rs.getString("name"));
                 test.setDescription(rs.getString("description"));
                 test.setCreatedBy(rs.getInt("created_by"));
-                test.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                if (rs.getTimestamp("created_at") != null) {
+                    test.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                }
                 test.setQuestionsPerSession(rs.getInt("questions_per_session"));
                 tests.add(test);
             }
