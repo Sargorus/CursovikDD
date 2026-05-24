@@ -136,6 +136,26 @@ public class TeacherController {
     // ========== Поиск и фильтрация ==========
 
     /**
+     * Получить все тесты из БД (для фильтра "Все тесты")
+     */
+    public List<Test> getAllTests() {
+        try {
+            return testDAO.findAll();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Получить имя автора по ID пользователя
+     */
+    public String getAuthorName(int userId) {
+        User user = userDAO.findById(userId);
+        return user != null ? user.getFullName() : "Неизвестный";
+    }
+
+    /**
      * Поиск тестов по названию
      */
     public List<Test> searchMyTests(String searchText) {
