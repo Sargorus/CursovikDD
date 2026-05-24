@@ -138,6 +138,16 @@ public class ParametersPanel extends JPanel {
                 return;
             }
 
+            // Проверка на дублирующееся имя
+            boolean duplicate = controller.getParameters().stream()
+                    .anyMatch(p -> p.getName().equals(name));
+            if (duplicate) {
+                JOptionPane.showMessageDialog(this,
+                        "Параметр с именем «" + name + "» уже существует!",
+                        "Дубликат", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             String type = (String) typeCombo.getSelectedItem();
             boolean isBinary = type.startsWith("Бинарная");
             String scaleType = isBinary ? "BINARY" : "RANGE";
@@ -286,6 +296,23 @@ public class ParametersPanel extends JPanel {
         String name = nameField.getText().trim().toUpperCase();
         if (name.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Введите название параметра!");
+            return;
+        }
+
+        // Проверка на дублирующееся имя (не считая сам редактируемый параметр)
+        final int currentRow = row;
+        boolean duplicate = false;
+        java.util.List<main.java.com.psychotest.model.Parameter> params = controller.getParameters();
+        for (int i = 0; i < params.size(); i++) {
+            if (i != currentRow && params.get(i).getName().equals(name)) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (duplicate) {
+            JOptionPane.showMessageDialog(this,
+                    "Параметр с именем «" + name + "» уже существует!",
+                    "Дубликат", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
