@@ -24,7 +24,6 @@ public class TestDAO {
 
             // 1. Сохраняем тест
             int testId = saveTest(conn, state, teacherId);
-            System.out.println("Сохранён тест: ID=" + testId + ", name=" + state.getTestName());
 
             // 2. Сохраняем параметры
             Map<String, Integer> paramIdMap = new HashMap<>();
@@ -43,14 +42,12 @@ public class TestDAO {
             }
 
             conn.commit();
-            System.out.println("Тест успешно сохранён в БД!");
             return testId;
 
         } catch (SQLException e) {
             if (conn != null) {
                 try {
                     conn.rollback();
-                    System.err.println("Транзакция откачена: " + e.getMessage());
                 } catch (SQLException ex) {
                     ex.printStackTrace();
                 }
@@ -153,10 +150,7 @@ public class TestDAO {
                 int paramIndex = entry.getKey();
                 int delta = entry.getValue();
                 if (paramIndex >= 0 && paramIndex < parameters.size()) {
-                    // Нужно получить реальный ID параметра из БД
-                    // В текущей реализации мы не храним маппинг индексов, поэтому пока пропускаем
                     // TODO: нужен маппинг индекс -> реальный ID параметра
-                    System.out.println("  Влияние: параметр индекс=" + paramIndex + ", delta=" + delta);
                 }
             }
         }

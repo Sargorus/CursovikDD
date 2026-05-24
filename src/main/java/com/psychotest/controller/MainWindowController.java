@@ -16,9 +16,8 @@ public class MainWindowController {
     public MainWindowController(MainWindow window, User user) {
         this.window = window;
         this.currentUser = user;
-        this.teacherController = new TeacherController(currentUser.getId());  // ← ИНИЦИАЛИЗАЦИЯ
+        this.teacherController = new TeacherController(currentUser.getId());
         attachListeners();
-        showWelcomeMessage();
     }
 
     private void attachListeners() {
@@ -59,14 +58,6 @@ public class MainWindowController {
         if (window.getExitItem() != null) {
             window.getExitItem().addActionListener(e -> exit());
         }
-    }
-
-    private void showWelcomeMessage() {
-        JOptionPane.showMessageDialog(window,
-                "Добро пожаловать в систему, " + currentUser.getFullName() + "!\n" +
-                        "Ваша роль: " + getRoleName(currentUser.getRole()),
-                "Добро пожаловать",
-                JOptionPane.INFORMATION_MESSAGE);
     }
 
     private String getRoleName(String role) {
