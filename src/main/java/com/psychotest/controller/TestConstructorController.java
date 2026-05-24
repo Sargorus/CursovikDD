@@ -70,6 +70,16 @@ public class TestConstructorController {
     public int getQuestionsPerSession() { return testState.getQuestionsPerSession(); }
     public int getCurrentStep() { return testState.getCurrentStep(); }
 
+    /** Возвращает параметр по индексу (для предзаполнения диалога редактирования) */
+    public Parameter getParameter(int index) {
+        return testState.getParameters().get(index);
+    }
+
+    /** Возвращает вопрос по индексу (для предзаполнения диалога редактирования) */
+    public Question getQuestion(int index) {
+        return testState.getQuestions().get(index);
+    }
+
     public TestValidationService.ValidationResult validateTest() {
         return validator.validate(testState);
     }
@@ -96,6 +106,38 @@ public class TestConstructorController {
         param.setScaleType(scaleType);
         param.setInterpretations(interpretations);
         testState.addParameter(param);
+        notifyModelChanged();
+    }
+
+    /**
+     * Обновляет параметр по индексу.
+     * Тип шкалы не меняется — он влияет на уже созданные влияния ответов.
+     */
+    public void updateParameter(int index, String name, List<ParameterInterpretation> interpretations) {
+        Parameter param = testState.getParameters().get(index);
+        param.setName(name);
+        param.setInterpretations(interpretations);
+        notifyModelChanged();
+    }
+
+    /**
+     * Обновляет вопрос по индексу — заменяет текст и все варианты ответов.
+     */
+    public void updateQuestion(int index, String text, List<AnswerOptionData> answers) {
+        Question q = testState.getQuestions().get(index);
+        q.setText(text);
+
+        List<AnswerOption> newOptions = new ArrayList<>();
+        for (AnswerOptionData data : answers) {
+            AnswerOption option = new AnswerOption();
+            option.setText(data.text);
+            option.setOrderNum(data.orderNum);
+            for (Map.Entry<Integer, Integer> entry : data.impacts.entrySet()) {
+                option.addParameterImpact(entry.getKey(), entry.getValue());
+            }
+            newOptions.add(option);
+        }
+        q.setAnswerOptions(newOptions);
         notifyModelChanged();
     }
 
