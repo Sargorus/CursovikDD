@@ -500,7 +500,11 @@ public class TestDAO {
             pstmt.setInt(1, testId);
             pstmt.setInt(2, assignedBy);
             pstmt.setInt(3, groupId);
-            pstmt.setDate(4, new java.sql.Date(dueDate.getTime()));
+            if (dueDate != null) {
+                pstmt.setDate(4, new java.sql.Date(dueDate.getTime()));
+            } else {
+                pstmt.setNull(4, Types.DATE);
+            }
             return pstmt.executeUpdate() > 0;
         }
     }

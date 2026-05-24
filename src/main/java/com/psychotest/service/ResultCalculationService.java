@@ -258,29 +258,46 @@ public class ResultCalculationService {
     }
 
     /**
-     * Сохранить результаты в БД
+     * Сохранить результаты в БД.
+     * Перед вставкой удаляем старые результаты этой сессии — защита от
+     * повторного вызова (двойное нажатие кнопки "Завершить" и т.п.).
      */
     private void saveResults(int sessionId, List<Parameter> parameters,
                              Map<String, Integer> rawScores,
                              Map<String, Integer> scaledScores,
                              Map<String, String> interpretations) throws SQLException {
-        String sql = "INSERT INTO test_results (session_id, parameter_id, raw_score, scaled_score, " +
-                "interpreted_code, interpretation_text) VALUES (?, ?, ?, ?, ?, ?)";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // Удаляем ранее сохранённые результаты для этой сессии (если есть)
+                try (PreparedStatement del = conn.prepareStatement(
+                        "DELETE FROM test_results WHERE session_id = ?")) {
+                    del.setInt(1, sessionId);
+                    del.executeUpdate();
+                }
 
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                // Вставляем новые результаты
+                String sql = "INSERT INTO test_results (session_id, parameter_id, raw_score, scaled_score, " +
+                        "interpreted_code, interpretation_text) VALUES (?, ?, ?, ?, ?, ?)";
+                try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                    for (Parameter param : parameters) {
+                        String paramName = param.getName();
+                        pstmt.setInt(1, sessionId);
+                        pstmt.setInt(2, param.getId());
+                        pstmt.setInt(3, rawScores.get(paramName));
+                        pstmt.setInt(4, scaledScores.get(paramName));
+                        pstmt.setString(5, null); // interpreted_code для диапазонных шкал
+                        pstmt.setString(6, interpretations.get(paramName));
+                        pstmt.addBatch();
+                    }
+                    pstmt.executeBatch();
+                }
 
-            for (Parameter param : parameters) {
-                String paramName = param.getName();
-                pstmt.setInt(1, sessionId);
-                pstmt.setInt(2, param.getId());
-                pstmt.setInt(3, rawScores.get(paramName));
-                pstmt.setInt(4, scaledScores.get(paramName));
-                pstmt.setString(5, null); // interpreted_code для диапазонных шкал
-                pstmt.setString(6, interpretations.get(paramName));
-                pstmt.addBatch();
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
             }
-            pstmt.executeBatch();
         }
     }
 }
