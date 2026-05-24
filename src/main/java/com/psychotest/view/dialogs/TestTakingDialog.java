@@ -272,8 +272,8 @@ public class TestTakingDialog extends JDialog {
     private void confirmAbandon() {
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Вы уверены, что хотите прервать тест?\n" +
-                        "Прогресс будет сохранён, но тест не будет засчитан.\n\n" +
-                        "Вы сможете продолжить позже.",
+                        "Тест не будет засчитан, результат не сохранится.\n" +
+                        "При следующем запуске тест начнётся заново.",
                 "Прерывание теста",
                 JOptionPane.YES_NO_OPTION);
 

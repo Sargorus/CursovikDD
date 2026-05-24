@@ -47,7 +47,13 @@ public class MyResultsPanel extends JPanel {
         resultsTable = new JTable(tableModel);
         resultsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         resultsTable.getSelectionModel().addListSelectionListener(e -> {
-            viewDetailButton.setEnabled(resultsTable.getSelectedRow() != -1);
+            int row = resultsTable.getSelectedRow();
+            if (row != -1) {
+                String status = (String) tableModel.getValueAt(row, 3);
+                viewDetailButton.setEnabled("Завершён".equals(status));
+            } else {
+                viewDetailButton.setEnabled(false);
+            }
         });
 
         resultsTable.getColumnModel().getColumn(0).setMaxWidth(50);
