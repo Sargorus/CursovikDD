@@ -261,7 +261,6 @@ public class TestConstructorDialog extends JDialog {
                     !controller.getParameters().isEmpty() ||
                     !controller.getQuestions().isEmpty()) {
                 controller.saveDraft();
-                System.out.println("Автосохранение выполнено в " + new java.util.Date());
             }
         });
         autoSaveTimer.start();
