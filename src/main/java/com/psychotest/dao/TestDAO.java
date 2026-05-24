@@ -25,11 +25,11 @@ public class TestDAO {
             // 1. Сохраняем тест
             int testId = saveTest(conn, state, teacherId);
 
-            // 2. Сохраняем параметры
-            Map<String, Integer> paramIdMap = new HashMap<>();
-            for (Parameter param : state.getParameters()) {
+            // 2. Сохраняем параметры и запоминаем их реальные ID из БД
+            List<Parameter> savedParams = state.getParameters();
+            for (Parameter param : savedParams) {
                 int paramId = saveParameter(conn, testId, param);
-                paramIdMap.put(param.getName(), paramId);
+                param.setId(paramId); // Записываем реальный ID обратно в объект
             }
 
             // 3. Сохраняем вопросы и ответы
@@ -37,7 +37,7 @@ public class TestDAO {
                 int questionId = saveQuestion(conn, testId, question);
                 for (AnswerOption option : question.getAnswerOptions()) {
                     int optionId = saveAnswerOption(conn, questionId, option);
-                    saveImpacts(conn, optionId, option.getParameterImpacts(), state.getParameters());
+                    saveImpacts(conn, optionId, option.getParameterImpacts(), savedParams);
                 }
             }
 
@@ -144,15 +144,22 @@ public class TestDAO {
     }
 
     private void saveImpacts(Connection conn, int optionId, Map<Integer, Integer> impacts, List<Parameter> parameters) throws SQLException {
+        if (impacts == null || impacts.isEmpty()) return;
+
         String sql = "INSERT INTO answer_parameter_impact (answer_option_id, parameter_id, delta) VALUES (?, ?, ?)";
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             for (Map.Entry<Integer, Integer> entry : impacts.entrySet()) {
                 int paramIndex = entry.getKey();
                 int delta = entry.getValue();
                 if (paramIndex >= 0 && paramIndex < parameters.size()) {
-                    // TODO: нужен маппинг индекс -> реальный ID параметра
+                    int paramId = parameters.get(paramIndex).getId(); // Реальный ID из БД
+                    pstmt.setInt(1, optionId);
+                    pstmt.setInt(2, paramId);
+                    pstmt.setInt(3, delta);
+                    pstmt.addBatch();
                 }
             }
+            pstmt.executeBatch();
         }
     }
 

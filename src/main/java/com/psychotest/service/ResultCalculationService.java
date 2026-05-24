@@ -53,11 +53,10 @@ public class ResultCalculationService {
             AnswerOption selected = selectedAnswers.get(q.getId());
             if (selected != null) {
                 Map<Integer, Integer> impacts = selected.getParameterImpacts();
-                for (int i = 0; i < parameters.size(); i++) {
-                    String paramName = parameters.get(i).getName();
-                    Integer delta = impacts.get(i);
+                for (Parameter param : parameters) {
+                    Integer delta = impacts.get(param.getId()); // Ключ — реальный ID параметра из БД
                     if (delta != null) {
-                        rawScores.put(paramName, rawScores.get(paramName) + delta);
+                        rawScores.put(param.getName(), rawScores.get(param.getName()) + delta);
                     }
                 }
             }
