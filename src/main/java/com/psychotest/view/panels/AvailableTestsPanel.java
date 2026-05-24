@@ -41,7 +41,8 @@ public class AvailableTestsPanel extends JPanel {
         testsTable = new JTable(tableModel);
         testsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         testsTable.getSelectionModel().addListSelectionListener(e -> {
-            startButton.setEnabled(testsTable.getSelectedRow() != -1);
+            int row = testsTable.getSelectedRow();
+            startButton.setEnabled(row != -1 && tableModel.getValueAt(row, 0) instanceof Integer);
         });
 
         testsTable.getColumnModel().getColumn(0).setMaxWidth(50);
