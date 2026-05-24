@@ -92,10 +92,10 @@ public class ResultsViewPanel extends JPanel {
         resultsTable = new JTable(tableModel);
         resultsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         resultsTable.getSelectionModel().addListSelectionListener(e -> {
-            boolean hasRow = resultsTable.getSelectedRow() != -1;
-            viewDetailButton.setEnabled(hasRow);
-            // Экспорт всего теста доступен всегда; выбранная строка нужна только для "одного результата"
-            // Состояние кнопки обновляется через updateExportButton()
+            int row = resultsTable.getSelectedRow();
+            // Включаем только когда выбрана реальная строка (не строка-заглушка)
+            boolean rowIsReal = row != -1 && tableModel.getValueAt(row, 0) instanceof Integer;
+            viewDetailButton.setEnabled(rowIsReal);
             updateExportButton();
         });
 
