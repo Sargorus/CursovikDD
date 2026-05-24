@@ -63,13 +63,21 @@ public class UsersPanel extends JPanel {
         addButton.addActionListener(e -> addUser());
 
         JButton editButton = new JButton("✏️ Редактировать");
+        editButton.setEnabled(false);
         editButton.addActionListener(e -> editUser());
 
         JButton deleteButton = new JButton("🗑️ Удалить");
+        deleteButton.setEnabled(false);
         deleteButton.addActionListener(e -> deleteUser());
 
         JButton refreshButton = new JButton("🔄 Обновить");
         refreshButton.addActionListener(e -> loadUsers());
+
+        usersTable.getSelectionModel().addListSelectionListener(e -> {
+            boolean hasSelection = usersTable.getSelectedRow() != -1;
+            editButton.setEnabled(hasSelection);
+            deleteButton.setEnabled(hasSelection);
+        });
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);

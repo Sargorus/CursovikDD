@@ -66,16 +66,25 @@ public class ResultCalculationService {
         // 5. Масштабируем результаты (если есть калибровка)
         Map<String, Integer> scaledScores = new HashMap<>();
         Map<String, String> interpretations = new HashMap<>();
+        Map<String, String> interpretedCodes = new HashMap<>(); // коды для бинарных шкал
 
         for (Parameter param : parameters) {
             int rawScore = rawScores.get(param.getName());
             int scaledScore = rawScore;
-            String interpretation = "";
+            String interpretation = "Нет интерпретации";
 
             if (param.getScaleType().equals("BINARY")) {
-                // Бинарная шкала: определяем по знаку
-                String code = rawScore > 0 ? "Плюс" : "Минус";
-                interpretation = findBinaryInterpretation(param, code);
+                // Бинарная шкала: выбираем интерпретацию по индексу.
+                // Левый полюс (index 0) — при score <= 0, правый (index 1) — при score > 0.
+                List<ParameterInterpretation> interps = param.getInterpretations();
+                if (!interps.isEmpty()) {
+                    ParameterInterpretation chosen = (rawScore > 0 && interps.size() > 1)
+                            ? interps.get(1) : interps.get(0);
+                    interpretation = chosen.getInterpretationText();
+                    if (chosen.getBinaryValue() != null) {
+                        interpretedCodes.put(param.getName(), chosen.getBinaryValue());
+                    }
+                }
             } else {
                 // Диапазонная шкала: ищем интерпретацию по диапазону
                 interpretation = findRangeInterpretation(param, rawScore);
@@ -90,7 +99,7 @@ public class ResultCalculationService {
         result.setCompleted(true);
 
         // 6. Сохраняем результаты в БД
-        saveResults(sessionId, parameters, rawScores, scaledScores, interpretations);
+        saveResults(sessionId, parameters, rawScores, scaledScores, interpretations, interpretedCodes);
 
         return result;
     }
@@ -265,7 +274,8 @@ public class ResultCalculationService {
     private void saveResults(int sessionId, List<Parameter> parameters,
                              Map<String, Integer> rawScores,
                              Map<String, Integer> scaledScores,
-                             Map<String, String> interpretations) throws SQLException {
+                             Map<String, String> interpretations,
+                             Map<String, String> interpretedCodes) throws SQLException {
         try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
             conn.setAutoCommit(false);
             try {
@@ -286,7 +296,7 @@ public class ResultCalculationService {
                         pstmt.setInt(2, param.getId());
                         pstmt.setInt(3, rawScores.get(paramName));
                         pstmt.setInt(4, scaledScores.get(paramName));
-                        pstmt.setString(5, null); // interpreted_code для диапазонных шкал
+                        pstmt.setString(5, interpretedCodes.getOrDefault(paramName, null));
                         pstmt.setString(6, interpretations.get(paramName));
                         pstmt.addBatch();
                     }
