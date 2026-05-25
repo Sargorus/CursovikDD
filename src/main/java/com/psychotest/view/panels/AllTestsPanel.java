@@ -1,24 +1,20 @@
 package main.java.com.psychotest.view.panels;
 
+import main.java.com.psychotest.controller.AdminController;
 import main.java.com.psychotest.controller.TeacherController;
-import main.java.com.psychotest.dao.TestDAO;
-import main.java.com.psychotest.dao.UserDAO;
 import main.java.com.psychotest.model.Test;
-import main.java.com.psychotest.model.User;
+import main.java.com.psychotest.model.TestState;
 import main.java.com.psychotest.view.dialogs.AssignTestDialog;
 import main.java.com.psychotest.view.dialogs.TestConstructorDialog;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.sql.SQLException;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 
 public class AllTestsPanel extends JPanel {
     private TeacherController controller;
-    private TestDAO testDAO;
-    private UserDAO userDAO;
+    private AdminController adminController;
     private JTable testsTable;
     private DefaultTableModel tableModel;
     private JTextField searchField;
@@ -37,18 +33,14 @@ public class AllTestsPanel extends JPanel {
     // Конструктор для преподавателя
     public AllTestsPanel(TeacherController controller) {
         this.controller = controller;
-        this.testDAO = new TestDAO();
-        this.userDAO = new UserDAO();
         this.isAdmin = false;
         initComponents();
         loadTests();
     }
 
     // Конструктор для администратора
-    public AllTestsPanel() {
-        this.controller = null;
-        this.testDAO = new TestDAO();
-        this.userDAO = new UserDAO();
+    public AllTestsPanel(AdminController adminController) {
+        this.adminController = adminController;
         this.isAdmin = true;
         initComponents();
         loadTestsForAdmin();
@@ -115,11 +107,12 @@ public class AllTestsPanel extends JPanel {
         testsTable = new JTable(tableModel);
         testsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         testsTable.getSelectionModel().addListSelectionListener(e -> {
-            boolean hasSelection = testsTable.getSelectedRow() != -1;
-            if (editButton != null) editButton.setEnabled(hasSelection);
-            if (deleteButton != null) deleteButton.setEnabled(hasSelection);
-            if (assignButton != null) assignButton.setEnabled(hasSelection);
-            if (resultsButton != null) resultsButton.setEnabled(hasSelection);
+            int row = testsTable.getSelectedRow();
+            boolean rowIsReal = row != -1 && tableModel.getValueAt(row, 0) instanceof Integer;
+            if (editButton != null) editButton.setEnabled(rowIsReal);
+            if (deleteButton != null) deleteButton.setEnabled(rowIsReal);
+            if (assignButton != null) assignButton.setEnabled(rowIsReal);
+            if (resultsButton != null) resultsButton.setEnabled(rowIsReal);
         });
 
         testsTable.getColumnModel().getColumn(0).setMaxWidth(50);
@@ -166,28 +159,12 @@ public class AllTestsPanel extends JPanel {
         tableModel.setRowCount(0);
 
         boolean showAll = filterCombo != null && "Все тесты".equals(filterCombo.getSelectedItem());
-        List<Test> tests = new ArrayList<>();
-
-        if (showAll) {
-            try {
-                tests = testDAO.findAll();
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-        } else {
-            tests = controller.getMyTests();
-        }
+        List<Test> tests = showAll ? controller.getAllTests() : controller.getMyTests();
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
         for (Test test : tests) {
-            String authorName;
-            if (showAll) {
-                authorName = getAuthorName(test.getCreatedBy());
-            } else {
-                authorName = "Я";
-            }
-
+            String authorName = showAll ? controller.getAuthorName(test.getCreatedBy()) : "Я";
             Object[] row = {
                     test.getId(),
                     test.getName(),
@@ -208,18 +185,11 @@ public class AllTestsPanel extends JPanel {
     private void loadTestsForAdmin() {
         tableModel.setRowCount(0);
 
-        List<Test> tests;
-        try {
-            tests = testDAO.findAll();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            tests = new ArrayList<>();
-        }
-
+        List<Test> tests = adminController.getAllTests();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
         for (Test test : tests) {
-            String authorName = getAuthorName(test.getCreatedBy());
+            String authorName = adminController.getAuthorName(test.getCreatedBy());
             Object[] row = {
                     test.getId(),
                     test.getName(),
@@ -242,7 +212,6 @@ public class AllTestsPanel extends JPanel {
 
         if (isAdmin) {
             loadTestsForAdmin();
-            // Фильтруем по поиску
             if (!searchText.isEmpty()) {
                 for (int i = tableModel.getRowCount() - 1; i >= 0; i--) {
                     String name = (String) tableModel.getValueAt(i, 1);
@@ -253,29 +222,24 @@ public class AllTestsPanel extends JPanel {
             }
         } else {
             boolean showAll = filterCombo != null && "Все тесты".equals(filterCombo.getSelectedItem());
-            List<Test> tests = new ArrayList<>();
+            List<Test> tests;
 
             if (showAll) {
-                try {
-                    tests = testDAO.findAll();
-                } catch (SQLException e) {
-                    e.printStackTrace();
+                tests = controller.getAllTests();
+                if (!searchText.isEmpty()) {
+                    tests = tests.stream()
+                            .filter(t -> t.getName().toLowerCase().contains(searchText))
+                            .toList();
                 }
             } else {
                 tests = controller.searchMyTests(searchText);
-            }
-
-            if (showAll && !searchText.isEmpty()) {
-                tests = tests.stream()
-                        .filter(t -> t.getName().toLowerCase().contains(searchText))
-                        .toList();
             }
 
             tableModel.setRowCount(0);
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
             for (Test test : tests) {
-                String authorName = showAll ? getAuthorName(test.getCreatedBy()) : "Я";
+                String authorName = showAll ? controller.getAuthorName(test.getCreatedBy()) : "Я";
                 Object[] row = {
                         test.getId(),
                         test.getName(),
@@ -290,16 +254,6 @@ public class AllTestsPanel extends JPanel {
             if (tests.isEmpty()) {
                 tableModel.addRow(new Object[]{"", "Нет тестов", "", "", "", ""});
             }
-        }
-    }
-
-    // Получить имя автора по ID
-    private String getAuthorName(int createdBy) {
-        try {
-            User user = userDAO.findById(createdBy);
-            return user != null ? user.getFullName() : "Неизвестный";
-        } catch (Exception e) {
-            return "Неизвестный";
         }
     }
 
@@ -327,14 +281,44 @@ public class AllTestsPanel extends JPanel {
             return;
         }
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValEdit = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValEdit instanceof Integer)) return;
+        int testId = (int) idValEdit;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
-        JOptionPane.showMessageDialog(this,
-                "Редактирование теста \"" + testName + "\"\n\n" +
-                        "В текущей версии редактирование доступно только через создание копии.\n" +
-                        "Скопируйте тест и отредактируйте копию.",
-                "Информация", JOptionPane.INFORMATION_MESSAGE);
+        // Загружаем полное состояние теста из БД
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+        TestState state;
+        try {
+            if (isAdmin) {
+                state = adminController.loadTestState(testId);
+            } else {
+                state = controller.loadTestState(testId);
+            }
+        } finally {
+            setCursor(Cursor.getDefaultCursor());
+        }
+
+        if (state == null) {
+            JOptionPane.showMessageDialog(this,
+                    "Не удалось загрузить тест для редактирования!\nПроверьте подключение к БД.",
+                    "Ошибка", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // Определяем teacherId для конструктора
+        int teacherId = isAdmin ? 0 : controller.getTeacherId();
+
+        Window parentWindow = SwingUtilities.getWindowAncestor(this);
+        TestConstructorDialog dialog = new TestConstructorDialog(parentWindow, teacherId, testId, state);
+        dialog.setVisible(true);
+
+        // Обновляем список после редактирования
+        if (isAdmin) {
+            loadTestsForAdmin();
+        } else {
+            loadTests();
+        }
     }
 
     // Назначение теста
@@ -345,7 +329,9 @@ public class AllTestsPanel extends JPanel {
             return;
         }
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValAssign = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValAssign instanceof Integer)) return;
+        int testId = (int) idValAssign;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         if (isAdmin) {
@@ -371,7 +357,9 @@ public class AllTestsPanel extends JPanel {
             return;
         }
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValResults = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValResults instanceof Integer)) return;
+        int testId = (int) idValResults;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         if (listener != null) {
@@ -387,7 +375,9 @@ public class AllTestsPanel extends JPanel {
             return;
         }
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValDelete = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValDelete instanceof Integer)) return;
+        int testId = (int) idValDelete;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         int confirm = JOptionPane.showConfirmDialog(this,
@@ -421,12 +411,7 @@ public class AllTestsPanel extends JPanel {
 
     // Удаление теста для администратора
     private boolean deleteTestAsAdmin(int testId) {
-        try {
-            return testDAO.delete(testId);
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
+        return adminController.deleteTest(testId);
     }
 
     // Обрезка длинных строк

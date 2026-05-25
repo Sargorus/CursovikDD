@@ -41,7 +41,8 @@ public class AvailableTestsPanel extends JPanel {
         testsTable = new JTable(tableModel);
         testsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         testsTable.getSelectionModel().addListSelectionListener(e -> {
-            startButton.setEnabled(testsTable.getSelectedRow() != -1);
+            int row = testsTable.getSelectedRow();
+            startButton.setEnabled(row != -1 && tableModel.getValueAt(row, 0) instanceof Integer);
         });
 
         testsTable.getColumnModel().getColumn(0).setMaxWidth(50);
@@ -91,13 +92,16 @@ public class AvailableTestsPanel extends JPanel {
             return;
         }
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idVal = tableModel.getValueAt(selectedRow, 0);
+        if (!(idVal instanceof Integer)) return;
+        int testId = (int) idVal;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         // Подтверждение начала теста
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Вы уверены, что хотите начать тест \"" + testName + "\"?\n" +
-                        "После начала вы не сможете прерваться (ответы сохраняются автоматически).",
+                        "Ответы сохраняются автоматически при переходе между вопросами.\n" +
+                        "Если вы прервёте тест, результат не будет засчитан.",
                 "Начало теста",
                 JOptionPane.YES_NO_OPTION);
 

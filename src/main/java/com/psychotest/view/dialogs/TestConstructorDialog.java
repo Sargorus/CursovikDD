@@ -1,6 +1,7 @@
 package main.java.com.psychotest.view.dialogs;
 
 import main.java.com.psychotest.controller.TestConstructorController;
+import main.java.com.psychotest.model.TestState;
 import main.java.com.psychotest.service.TestDraftService;
 import main.java.com.psychotest.view.panels.TestInfoPanel;
 import main.java.com.psychotest.view.panels.ParametersPanel;
@@ -29,14 +30,44 @@ public class TestConstructorDialog extends JDialog {
     private JButton saveDraftButton;
     private JButton cancelButton;
 
+    /** Конструктор для создания нового теста */
     public TestConstructorDialog(Window parent, int teacherId) {
         super(parent, "Конструктор тестов", ModalityType.APPLICATION_MODAL);
         this.teacherId = teacherId;
-        this.controller = new TestConstructorController(teacherId);
         this.draftService = new TestDraftService();
+
+        // Если на диске есть старый черновик — спрашиваем пользователя
+        if (draftService.hasDraft(teacherId)) {
+            int choice = JOptionPane.showConfirmDialog(
+                    parent,
+                    "Найден несохранённый черновик теста.\nПродолжить с черновиком?",
+                    "Черновик найден",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE);
+            if (choice != JOptionPane.YES_OPTION) {
+                draftService.clearDraft(teacherId);  // удаляем черновик, откроем пустой конструктор
+            }
+        }
+
+        this.controller = new TestConstructorController(teacherId);
 
         initComponents();
         setupAutoSave();
+        setupWindowListener();
+
+        setSize(900, 700);
+        setLocationRelativeTo(parent);
+    }
+
+    /** Конструктор для редактирования существующего теста */
+    public TestConstructorDialog(Window parent, int teacherId, int editingTestId, TestState existingState) {
+        super(parent, "Редактирование теста", ModalityType.APPLICATION_MODAL);
+        this.teacherId = teacherId;
+        this.controller = new TestConstructorController(teacherId, editingTestId, existingState);
+        this.draftService = new TestDraftService();
+
+        initComponents();
+        // В режиме редактирования автосохранение черновика не нужно
         setupWindowListener();
 
         setSize(900, 700);
@@ -85,6 +116,9 @@ public class TestConstructorDialog extends JDialog {
         nextButton.addActionListener(e -> nextStep());
         saveDraftButton.addActionListener(e -> saveDraft());
         cancelButton.addActionListener(e -> cancel());
+
+        // В режиме редактирования черновик не нужен — скрываем кнопку
+        saveDraftButton.setVisible(!controller.isEditMode());
 
         // Стилизация кнопок
         styleButton(prevButton, new Color(100, 100, 100));
@@ -210,16 +244,23 @@ public class TestConstructorDialog extends JDialog {
             return;
         }
 
+        String confirmMsg = controller.isEditMode()
+                ? "Сохранить изменения теста \"" + controller.getTestName() + "\"?\n\nВнимание: предыдущие параметры и вопросы будут заменены."
+                : "Сохранить тест \"" + controller.getTestName() + "\"?";
+
         int confirm = JOptionPane.showConfirmDialog(this,
-                "Сохранить тест \"" + controller.getTestName() + "\"?",
+                confirmMsg,
                 "Подтверждение сохранения",
                 JOptionPane.YES_NO_OPTION);
 
         if (confirm == JOptionPane.YES_OPTION) {
             try {
                 int testId = controller.saveTestToDatabase();
+                String successMsg = controller.isEditMode()
+                        ? "Тест успешно обновлён!\nID теста: " + testId
+                        : "Тест успешно сохранён!\nID теста: " + testId;
                 JOptionPane.showMessageDialog(this,
-                        "Тест успешно сохранён!\nID теста: " + testId,
+                        successMsg,
                         "Успех", JOptionPane.INFORMATION_MESSAGE);
                 dispose();
             } catch (SQLException e) {
@@ -261,7 +302,6 @@ public class TestConstructorDialog extends JDialog {
                     !controller.getParameters().isEmpty() ||
                     !controller.getQuestions().isEmpty()) {
                 controller.saveDraft();
-                System.out.println("Автосохранение выполнено в " + new java.util.Date());
             }
         });
         autoSaveTimer.start();
@@ -271,12 +311,15 @@ public class TestConstructorDialog extends JDialog {
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                autoSaveTimer.stop();
-                // Последнее автосохранение перед закрытием
-                if (!controller.getTestName().isEmpty() ||
-                        !controller.getParameters().isEmpty() ||
-                        !controller.getQuestions().isEmpty()) {
-                    controller.saveDraft();
+                // autoSaveTimer == null в режиме редактирования (setupAutoSave не вызывается)
+                if (autoSaveTimer != null) {
+                    autoSaveTimer.stop();
+                    // Последнее автосохранение перед закрытием (только в режиме создания)
+                    if (!controller.getTestName().isEmpty() ||
+                            !controller.getParameters().isEmpty() ||
+                            !controller.getQuestions().isEmpty()) {
+                        controller.saveDraft();
+                    }
                 }
             }
         });

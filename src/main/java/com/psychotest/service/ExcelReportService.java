@@ -2,8 +2,8 @@ package main.java.com.psychotest.service;
 
 import main.java.com.psychotest.model.Test;
 import main.java.com.psychotest.model.User;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -27,7 +27,7 @@ public class ExcelReportService {
     public boolean exportResultsToExcel(List<ResultService.TestResult> results,
                                         Test test,
                                         String filePath) {
-        try (Workbook workbook = new XSSFWorkbook()) {
+        try (Workbook workbook = new HSSFWorkbook()) {
 
             // Создаём стили
             Map<String, CellStyle> styles = createStyles(workbook);
@@ -66,7 +66,7 @@ public class ExcelReportService {
                                                String userName,
                                                String testName,
                                                String filePath) {
-        try (Workbook workbook = new XSSFWorkbook()) {
+        try (Workbook workbook = new HSSFWorkbook()) {
             Map<String, CellStyle> styles = createStyles(workbook);
 
             // Лист с результатами по шкалам
@@ -184,11 +184,12 @@ public class ExcelReportService {
         int num = 1;
         for (ResultService.TestResult result : results) {
             Row row = sheet.createRow(rowNum++);
+            CellStyle normal = styles.get("normal");
 
-            row.createCell(0).setCellValue(num++);
-            row.createCell(1).setCellValue(result.getUserFullName());
-            row.createCell(2).setCellValue(result.getUserLogin());
-            row.createCell(3).setCellValue(result.getFormattedDate());
+            Cell c0 = row.createCell(0); c0.setCellValue(num++); c0.setCellStyle(normal);
+            Cell c1 = row.createCell(1); c1.setCellValue(result.getUserFullName()); c1.setCellStyle(normal);
+            Cell c2 = row.createCell(2); c2.setCellValue(result.getUserLogin()); c2.setCellStyle(normal);
+            Cell c3 = row.createCell(3); c3.setCellValue(result.getFormattedDate()); c3.setCellStyle(normal);
 
             Cell statusCell = row.createCell(4);
             statusCell.setCellValue(getStatusText(result.getStatus()));
@@ -220,12 +221,13 @@ public class ExcelReportService {
 
         for (ResultService.TestResult result : results) {
             Row row = sheet.createRow(rowNum++);
+            CellStyle normal = styles.get("normal");
 
-            row.createCell(0).setCellValue(result.getSessionId());
-            row.createCell(1).setCellValue(result.getUserFullName());
-            row.createCell(2).setCellValue(result.getUserLogin());
-            row.createCell(3).setCellValue(formatTimestamp(result.getStartTime()));
-            row.createCell(4).setCellValue(formatTimestamp(result.getEndTime()));
+            Cell c0 = row.createCell(0); c0.setCellValue(result.getSessionId()); c0.setCellStyle(normal);
+            Cell c1 = row.createCell(1); c1.setCellValue(result.getUserFullName()); c1.setCellStyle(normal);
+            Cell c2 = row.createCell(2); c2.setCellValue(result.getUserLogin()); c2.setCellStyle(normal);
+            Cell c3 = row.createCell(3); c3.setCellValue(formatTimestamp(result.getStartTime())); c3.setCellStyle(normal);
+            Cell c4 = row.createCell(4); c4.setCellValue(formatTimestamp(result.getEndTime())); c4.setCellStyle(normal);
 
             Cell statusCell = row.createCell(5);
             statusCell.setCellValue(getStatusText(result.getStatus()));
@@ -236,7 +238,7 @@ public class ExcelReportService {
             if (result.getStartTime() != null && result.getEndTime() != null) {
                 minutes = (result.getEndTime().getTime() - result.getStartTime().getTime()) / (60 * 1000);
             }
-            row.createCell(6).setCellValue(minutes);
+            Cell c6 = row.createCell(6); c6.setCellValue(minutes); c6.setCellStyle(normal);
         }
     }
 
@@ -281,13 +283,14 @@ public class ExcelReportService {
             for (var entry : detail.getParameterResults().entrySet()) {
                 ResultService.ParameterResult pr = entry.getValue();
                 Row row = sheet.createRow(rowNum++);
+                CellStyle normal = styles.get("normal");
 
-                row.createCell(0).setCellValue(pr.getParamName());
-                row.createCell(1).setCellValue(pr.getScaleType().equals("BINARY") ? "Бинарная" : "Диапазонная");
-                row.createCell(2).setCellValue(pr.getRawScore());
-                row.createCell(3).setCellValue(pr.getScaledScore());
-                row.createCell(4).setCellValue(pr.getInterpretedCode() != null ? pr.getInterpretedCode() : "");
-                row.createCell(5).setCellValue(pr.getInterpretationText());
+                Cell c0 = row.createCell(0); c0.setCellValue(pr.getParamName()); c0.setCellStyle(normal);
+                Cell c1 = row.createCell(1); c1.setCellValue(pr.getScaleType().equals("BINARY") ? "Бинарная" : "Диапазонная"); c1.setCellStyle(normal);
+                Cell c2 = row.createCell(2); c2.setCellValue(pr.getRawScore()); c2.setCellStyle(normal);
+                Cell c3 = row.createCell(3); c3.setCellValue(pr.getScaledScore()); c3.setCellStyle(normal);
+                Cell c4 = row.createCell(4); c4.setCellValue(pr.getInterpretedCode() != null ? pr.getInterpretedCode() : ""); c4.setCellStyle(normal);
+                Cell c5 = row.createCell(5); c5.setCellValue(pr.getInterpretationText()); c5.setCellStyle(normal);
             }
         }
     }
@@ -329,9 +332,11 @@ public class ExcelReportService {
             int num = 1;
             for (ResultService.AnswerDetail answer : detail.getAnswers()) {
                 Row row = sheet.createRow(rowNum++);
-                row.createCell(0).setCellValue(num++);
-                row.createCell(1).setCellValue(answer.getQuestionText());
-                row.createCell(2).setCellValue(answer.getAnswerText());
+                CellStyle normal = styles.get("normal");
+
+                Cell c0 = row.createCell(0); c0.setCellValue(num++); c0.setCellStyle(normal);
+                Cell c1 = row.createCell(1); c1.setCellValue(answer.getQuestionText()); c1.setCellStyle(normal);
+                Cell c2 = row.createCell(2); c2.setCellValue(answer.getAnswerText()); c2.setCellStyle(normal);
             }
         }
     }

@@ -86,27 +86,46 @@ public class ResultService {
             detail.setParameterResults(paramResults);
         }
 
-        // Получаем ответы на вопросы
-        String answerSql = "SELECT q.text as question_text, a_o.text as answer_text " +
+        // Получаем ответы на вопросы вместе с влиянием каждого ответа на параметры.
+        // LEFT JOIN — если у ответа нет влияний, строка всё равно попадёт в результат
+        // (param_name и delta будут NULL).
+        String answerSql =
+                "SELECT q.id AS question_id, q.order_num, q.text AS question_text, " +
+                "       a_o.text AS answer_text, " +
+                "       p.name  AS param_name, api.delta " +
                 "FROM user_answers ua " +
-                "JOIN questions q ON ua.question_id = q.id " +
-                "JOIN answer_options a_o ON ua.answer_option_id = a_o.id " +
+                "JOIN  questions             q   ON ua.question_id     = q.id " +
+                "JOIN  answer_options        a_o ON ua.answer_option_id = a_o.id " +
+                "LEFT JOIN answer_parameter_impact api ON api.answer_option_id = a_o.id " +
+                "LEFT JOIN parameters        p   ON api.parameter_id   = p.id " +
                 "WHERE ua.session_id = ? " +
-                "ORDER BY q.order_num";
+                "ORDER BY q.order_num, p.id";
 
         try (Connection conn = DatabaseConnection.getInstance().getConnection();
              PreparedStatement pstmt = conn.prepareStatement(answerSql)) {
             pstmt.setInt(1, sessionId);
             ResultSet rs = pstmt.executeQuery();
 
-            List<AnswerDetail> answers = new ArrayList<>();
+            // LinkedHashMap сохраняет порядок вопросов; ключ — question_id
+            Map<Integer, AnswerDetail> answersMap = new java.util.LinkedHashMap<>();
             while (rs.next()) {
-                AnswerDetail ad = new AnswerDetail();
-                ad.setQuestionText(rs.getString("question_text"));
-                ad.setAnswerText(rs.getString("answer_text"));
-                answers.add(ad);
+                int qId = rs.getInt("question_id");
+                AnswerDetail ad = answersMap.computeIfAbsent(qId, k -> {
+                    AnswerDetail a = new AnswerDetail();
+                    try {
+                        a.setQuestionText(rs.getString("question_text"));
+                        a.setAnswerText(rs.getString("answer_text"));
+                    } catch (SQLException ex) {
+                        ex.printStackTrace();
+                    }
+                    return a;
+                });
+                String paramName = rs.getString("param_name");
+                if (paramName != null) {
+                    ad.getParameterImpacts().put(paramName, rs.getInt("delta"));
+                }
             }
-            detail.setAnswers(answers);
+            detail.setAnswers(new ArrayList<>(answersMap.values()));
         }
 
         return detail;
@@ -186,12 +205,19 @@ public class ResultService {
     public static class AnswerDetail {
         private String questionText;
         private String answerText;
+        /** Название параметра → балл (delta), полученный за этот ответ */
+        private Map<String, Integer> parameterImpacts = new java.util.LinkedHashMap<>();
 
         public String getQuestionText() { return questionText; }
         public void setQuestionText(String questionText) { this.questionText = questionText; }
 
         public String getAnswerText() { return answerText; }
         public void setAnswerText(String answerText) { this.answerText = answerText; }
+
+        public Map<String, Integer> getParameterImpacts() { return parameterImpacts; }
+        public void setParameterImpacts(Map<String, Integer> parameterImpacts) {
+            this.parameterImpacts = parameterImpacts;
+        }
     }
 
     public static class SessionDetail {

@@ -54,7 +54,10 @@ public class GroupMembersDialog extends JDialog {
         leftPanel.add(membersScroll, BorderLayout.CENTER);
 
         JButton removeButton = new JButton("➖ Удалить из группы");
+        removeButton.setEnabled(false);
         removeButton.addActionListener(e -> removeMember());
+        membersTable.getSelectionModel().addListSelectionListener(e ->
+                removeButton.setEnabled(membersTable.getSelectedRow() != -1));
         leftPanel.add(removeButton, BorderLayout.SOUTH);
 
         // Правая панель - доступные пользователи
@@ -88,7 +91,10 @@ public class GroupMembersDialog extends JDialog {
         rightPanel.add(searchPanel, BorderLayout.NORTH);
 
         JButton addButton = new JButton("➕ Добавить в группу");
+        addButton.setEnabled(false);
         addButton.addActionListener(e -> addMember());
+        availableUsersTable.getSelectionModel().addListSelectionListener(e ->
+                addButton.setEnabled(availableUsersTable.getSelectedRow() != -1));
         rightPanel.add(addButton, BorderLayout.SOUTH);
 
         mainPanel.add(leftPanel);

@@ -18,6 +18,7 @@ public class ResultsViewPanel extends JPanel {
     private DefaultTableModel tableModel;
     private JButton exportButton;
     private JButton viewDetailButton;
+    private JButton deleteResultButton;
     private JLabel currentTestLabel;
     private int preSelectedTestId = -1;
     private String preSelectedTestName = "";
@@ -59,6 +60,7 @@ public class ResultsViewPanel extends JPanel {
             if (testCombo.getSelectedItem() != null) {
                 loadResults();
             }
+            updateExportButton();
         });
         selectPanel.add(testCombo);
 
@@ -91,8 +93,12 @@ public class ResultsViewPanel extends JPanel {
         resultsTable = new JTable(tableModel);
         resultsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         resultsTable.getSelectionModel().addListSelectionListener(e -> {
-            viewDetailButton.setEnabled(resultsTable.getSelectedRow() != -1);
-            exportButton.setEnabled(resultsTable.getSelectedRow() != -1);
+            int row = resultsTable.getSelectedRow();
+            // Включаем только когда выбрана реальная строка (не строка-заглушка)
+            boolean rowIsReal = row != -1 && tableModel.getValueAt(row, 0) instanceof Integer;
+            viewDetailButton.setEnabled(rowIsReal);
+            deleteResultButton.setEnabled(rowIsReal);
+            updateExportButton();
         });
 
         resultsTable.getColumnModel().getColumn(0).setMaxWidth(80);
@@ -110,11 +116,16 @@ public class ResultsViewPanel extends JPanel {
         viewDetailButton.setEnabled(false);
         viewDetailButton.addActionListener(e -> viewDetail());
 
+        deleteResultButton = new JButton("🗑️ Удалить результат");
+        deleteResultButton.setEnabled(false);
+        deleteResultButton.addActionListener(e -> deleteResult());
+
         exportButton = new JButton("📊 Экспорт в Excel");
-        exportButton.setEnabled(false);
+        exportButton.setEnabled(false); // включается после выбора теста
         exportButton.addActionListener(e -> exportToExcel());
 
         buttonPanel.add(viewDetailButton);
+        buttonPanel.add(deleteResultButton);
         buttonPanel.add(exportButton);
 
         add(buttonPanel, BorderLayout.SOUTH);
@@ -132,9 +143,15 @@ public class ResultsViewPanel extends JPanel {
         }
     }
 
+    /** Включает кнопку экспорта если выбран тест; строка при этом не обязательна */
+    private void updateExportButton() {
+        exportButton.setEnabled(testCombo.getSelectedItem() != null);
+    }
+
     private void loadResults() {
         tableModel.setRowCount(0);
         Test selectedTest = (Test) testCombo.getSelectedItem();
+        updateExportButton();
         if (selectedTest == null) {
             currentTestLabel.setText("Текущий тест: не выбран");
             return;
@@ -177,7 +194,9 @@ public class ResultsViewPanel extends JPanel {
             return;
         }
 
-        int sessionId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValDetail = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValDetail instanceof Integer)) return;
+        int sessionId = (int) idValDetail;
         String userName = (String) tableModel.getValueAt(selectedRow, 1);
 
         Test selectedTest = (Test) testCombo.getSelectedItem();
@@ -218,28 +237,65 @@ public class ResultsViewPanel extends JPanel {
         worker.execute();
     }
 
-    private void exportToExcel() {
+    private void deleteResult() {
         int selectedRow = resultsTable.getSelectedRow();
-        if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this, "Выберите результат для экспорта!");
+        if (selectedRow == -1) return;
+
+        Object idVal = tableModel.getValueAt(selectedRow, 0);
+        if (!(idVal instanceof Integer)) return;
+        int sessionId = (int) idVal;
+        String userName = (String) tableModel.getValueAt(selectedRow, 1);
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Удалить результат тестирования пользователя «" + userName + "»?\n\n" +
+                "Будут удалены: ответы на вопросы, результаты по параметрам\n" +
+                "и запись о прохождении теста. Это действие нельзя отменить.",
+                "Подтверждение удаления",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            boolean success = controller.deleteResult(sessionId);
+            if (success) {
+                JOptionPane.showMessageDialog(this,
+                        "Результат успешно удалён.",
+                        "Готово", JOptionPane.INFORMATION_MESSAGE);
+                loadResults();
+            } else {
+                JOptionPane.showMessageDialog(this,
+                        "Ошибка при удалении результата!",
+                        "Ошибка", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void exportToExcel() {
+        Test selectedTest = (Test) testCombo.getSelectedItem();
+        if (selectedTest == null) {
+            JOptionPane.showMessageDialog(this, "Выберите тест для экспорта!");
             return;
         }
 
-        int option = JOptionPane.showOptionDialog(this,
-                "Что вы хотите экспортировать?",
-                "Экспорт в Excel",
-                JOptionPane.YES_NO_CANCEL_OPTION,
-                JOptionPane.QUESTION_MESSAGE,
-                null,
-                new String[]{"Все результаты теста", "Только выбранный результат", "Отмена"},
-                "Все результаты теста");
+        int selectedRow = resultsTable.getSelectedRow();
+        int option;
 
-        if (option == 2 || option == JOptionPane.CLOSED_OPTION) {
-            return;
+        if (selectedRow == -1) {
+            // Строка не выбрана — только экспорт всего теста
+            option = 0;
+        } else {
+            option = JOptionPane.showOptionDialog(this,
+                    "Что вы хотите экспортировать?",
+                    "Экспорт в Excel",
+                    JOptionPane.YES_NO_CANCEL_OPTION,
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    new String[]{"Все результаты теста", "Только выбранный результат", "Отмена"},
+                    "Все результаты теста");
+            if (option == 2 || option == JOptionPane.CLOSED_OPTION) return;
         }
 
         JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setSelectedFile(new File("report.xlsx"));
+        fileChooser.setSelectedFile(new File("report.xls"));
         fileChooser.setDialogTitle("Сохранить отчёт как...");
 
         if (fileChooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
@@ -247,9 +303,13 @@ public class ResultsViewPanel extends JPanel {
         }
 
         String basePath = fileChooser.getSelectedFile().getAbsolutePath();
-        String finalPath = basePath.endsWith(".xlsx") ? basePath : basePath + ".xlsx";
-        int sessionId = (int) tableModel.getValueAt(selectedRow, 0);
-        Test selectedTest = (Test) testCombo.getSelectedItem();
+        String finalPath = basePath.endsWith(".xls") ? basePath : basePath + ".xls";
+        // Если выбрана строка-заглушка (ID не Integer) — сбрасываем выбор
+        boolean rowIsReal = selectedRow >= 0 && tableModel.getValueAt(selectedRow, 0) instanceof Integer;
+        if (!rowIsReal && option != 0) {
+            option = 0; // принудительно экспортируем весь тест
+        }
+        int sessionId = rowIsReal ? (int) tableModel.getValueAt(selectedRow, 0) : -1;
         int exportOption = option;
 
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));

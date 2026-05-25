@@ -72,14 +72,15 @@ public class UserTestsPanel extends JPanel {
         testsTable = new JTable(tableModel);
         testsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         testsTable.getSelectionModel().addListSelectionListener(e -> {
-            boolean hasSelection = testsTable.getSelectedRow() != -1;
+            int row = testsTable.getSelectedRow();
+            boolean rowIsReal = row != -1 && tableModel.getValueAt(row, 0) instanceof Integer;
             boolean isCompleted = false;
-            if (hasSelection) {
-                String status = (String) tableModel.getValueAt(testsTable.getSelectedRow(), 3);
+            if (rowIsReal) {
+                String status = (String) tableModel.getValueAt(row, 3);
                 isCompleted = "Завершён".equals(status);
             }
-            viewResultButton.setEnabled(hasSelection && isCompleted);
-            unassignButton.setEnabled(hasSelection && !isCompleted);
+            viewResultButton.setEnabled(rowIsReal && isCompleted);
+            unassignButton.setEnabled(rowIsReal && !isCompleted);
         });
 
         testsTable.getColumnModel().getColumn(0).setMaxWidth(50);
@@ -230,7 +231,9 @@ public class UserTestsPanel extends JPanel {
         int selectedRow = testsTable.getSelectedRow();
         if (selectedRow == -1) return;
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValView = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValView instanceof Integer)) return;
+        int testId = (int) idValView;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         // Находим сессию с результатами
@@ -260,7 +263,9 @@ public class UserTestsPanel extends JPanel {
         int selectedRow = testsTable.getSelectedRow();
         if (selectedRow == -1) return;
 
-        int testId = (int) tableModel.getValueAt(selectedRow, 0);
+        Object idValUnassign = tableModel.getValueAt(selectedRow, 0);
+        if (!(idValUnassign instanceof Integer)) return;
+        int testId = (int) idValUnassign;
         String testName = (String) tableModel.getValueAt(selectedRow, 1);
 
         int confirm = JOptionPane.showConfirmDialog(this,

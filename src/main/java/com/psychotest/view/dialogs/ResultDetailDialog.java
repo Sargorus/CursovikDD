@@ -1,5 +1,6 @@
 package main.java.com.psychotest.view.dialogs;
 
+import main.java.com.psychotest.service.ExcelReportService;
 import main.java.com.psychotest.service.ResultService;
 import javax.swing.*;
 import java.awt.*;
@@ -8,6 +9,7 @@ public class ResultDetailDialog extends JDialog {
     private ResultService.SessionDetail detail;
     private String userName;
     private String testName;
+    private ExcelReportService excelReportService = new ExcelReportService();
 
     public ResultDetailDialog(Window parent, ResultService.SessionDetail detail,
                               String userName, String testName) {
@@ -59,7 +61,7 @@ public class ResultDetailDialog extends JDialog {
     private void exportToExcel() {
         JFileChooser fileChooser = new JFileChooser();
         String defaultFileName = "result_" + userName + "_" +
-                java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+                java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xls";
         fileChooser.setSelectedFile(new java.io.File(defaultFileName));
         fileChooser.setDialogTitle("Сохранить отчёт как...");
 
@@ -67,16 +69,39 @@ public class ResultDetailDialog extends JDialog {
             return;
         }
 
-        String filePath = fileChooser.getSelectedFile().getAbsolutePath();
-        if (!filePath.endsWith(".xlsx")) {
-            filePath += ".xlsx";
-        }
+        String rawPath = fileChooser.getSelectedFile().getAbsolutePath();
+        final String filePath = rawPath.endsWith(".xls") ? rawPath : rawPath + ".xls";
 
-        // TODO: Вызвать экспорт через контроллер
-        JOptionPane.showMessageDialog(this,
-                "Экспорт детального отчёта будет реализован в следующей версии.\n" +
-                        "Пока что используйте экспорт из главного окна.",
-                "Информация", JOptionPane.INFORMATION_MESSAGE);
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+
+        new SwingWorker<Boolean, Void>() {
+            @Override
+            protected Boolean doInBackground() {
+                return excelReportService.exportSessionDetailsToExcel(detail, userName, testName, filePath);
+            }
+
+            @Override
+            protected void done() {
+                setCursor(Cursor.getDefaultCursor());
+                try {
+                    boolean success = get();
+                    if (success) {
+                        JOptionPane.showMessageDialog(ResultDetailDialog.this,
+                                "Отчёт успешно сохранён:\n" + filePath,
+                                "Экспорт завершён", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(ResultDetailDialog.this,
+                                "Ошибка при сохранении файла!\nПроверьте права доступа и путь.",
+                                "Ошибка экспорта", JOptionPane.ERROR_MESSAGE);
+                    }
+                } catch (Exception e) {
+                    setCursor(Cursor.getDefaultCursor());
+                    JOptionPane.showMessageDialog(ResultDetailDialog.this,
+                            "Ошибка: " + e.getMessage(),
+                            "Ошибка экспорта", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
     }
 
     private JPanel createParametersPanel() {
@@ -142,7 +167,7 @@ public class ResultDetailDialog extends JDialog {
 
         int questionNum = 1;
         for (ResultService.AnswerDetail answer : detail.getAnswers()) {
-            JPanel questionPanel = createQuestionPanel(questionNum++, answer.getQuestionText(), answer.getAnswerText());
+            JPanel questionPanel = createQuestionPanel(questionNum++, answer);
             listPanel.add(questionPanel);
             listPanel.add(Box.createVerticalStrut(10));
         }
@@ -154,7 +179,7 @@ public class ResultDetailDialog extends JDialog {
         return panel;
     }
 
-    private JPanel createQuestionPanel(int number, String questionText, String answerText) {
+    private JPanel createQuestionPanel(int number, ResultService.AnswerDetail answer) {
         JPanel panel = new JPanel(new BorderLayout(5, 5));
         panel.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(Color.GRAY),
@@ -163,16 +188,53 @@ public class ResultDetailDialog extends JDialog {
         panel.setBackground(new Color(250, 250, 250));
 
         // Номер и текст вопроса
-        JLabel questionLabel = new JLabel("<html><b>Вопрос " + number + ":</b> " + escapeHtml(questionText) + "</html>");
+        JLabel questionLabel = new JLabel(
+                "<html><b>Вопрос " + number + ":</b> " + escapeHtml(answer.getQuestionText()) + "</html>");
         questionLabel.setFont(new Font("Arial", Font.PLAIN, 12));
 
-        // Ответ
-        JLabel answerLabel = new JLabel("<html><b>Ответ:</b> " + escapeHtml(answerText) + "</html>");
+        // Ответ пользователя
+        JLabel answerLabel = new JLabel(
+                "<html><b>Ответ:</b> " + escapeHtml(answer.getAnswerText()) + "</html>");
         answerLabel.setFont(new Font("Arial", Font.ITALIC, 12));
         answerLabel.setForeground(new Color(0, 100, 0));
 
         panel.add(questionLabel, BorderLayout.NORTH);
-        panel.add(answerLabel, BorderLayout.CENTER);
+
+        // Если есть влияния на параметры — строим панель с баллами под ответом
+        if (!answer.getParameterImpacts().isEmpty()) {
+            JPanel answerWithScores = new JPanel();
+            answerWithScores.setLayout(new BoxLayout(answerWithScores, BoxLayout.Y_AXIS));
+            answerWithScores.setOpaque(false);
+
+            answerLabel.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+            answerWithScores.add(answerLabel);
+            answerWithScores.add(Box.createVerticalStrut(4));
+
+            // Строка с баллами: «Баллы: Экстраверсия +1 · Нейротизм −1»
+            StringBuilder sb = new StringBuilder("<html><font color='#555555'><i>Баллы:&nbsp;</i></font>");
+            boolean first = true;
+            for (var entry : answer.getParameterImpacts().entrySet()) {
+                if (!first) sb.append("<font color='#888888'>&nbsp;·&nbsp;</font>");
+                int delta = entry.getValue();
+                String color = delta > 0 ? "#1a6b1a" : (delta < 0 ? "#8b0000" : "#555555");
+                String sign  = delta > 0 ? "+" : "";
+                sb.append("<font color='").append(color).append("'><b>")
+                  .append(escapeHtml(entry.getKey()))
+                  .append("&nbsp;").append(sign).append(delta)
+                  .append("</b></font>");
+                first = false;
+            }
+            sb.append("</html>");
+
+            JLabel scoresLabel = new JLabel(sb.toString());
+            scoresLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+            scoresLabel.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+            answerWithScores.add(scoresLabel);
+
+            panel.add(answerWithScores, BorderLayout.CENTER);
+        } else {
+            panel.add(answerLabel, BorderLayout.CENTER);
+        }
 
         return panel;
     }
@@ -211,7 +273,10 @@ public class ResultDetailDialog extends JDialog {
             if (pr.getInterpretedCode() != null && !pr.getInterpretedCode().isEmpty()) {
                 sb.append("   Код: ").append(pr.getInterpretedCode()).append("\n");
             }
-            sb.append("   ").append(pr.getInterpretationText()).append("\n");
+            String interpText = pr.getInterpretationText();
+            if (interpText != null && !interpText.isEmpty()) {
+                sb.append("   ").append(interpText).append("\n");
+            }
             sb.append("\n");
         }
 

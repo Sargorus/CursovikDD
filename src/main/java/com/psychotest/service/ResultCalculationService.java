@@ -12,10 +12,6 @@ public class ResultCalculationService {
      * Рассчитывает результаты теста на основе ответов пользователя
      */
     public TestResult calculateResults(int sessionId, Test test) throws SQLException {
-        System.out.println("=== РАСЧЁТ РЕЗУЛЬТАТОВ ===");
-        System.out.println("sessionId: " + sessionId);
-        System.out.println("test: " + test.getName());
-
         TestResult result = new TestResult();
         result.setSessionId(sessionId);
         result.setTestId(test.getId());
@@ -23,10 +19,8 @@ public class ResultCalculationService {
 
         // 1. Получаем все ответы пользователя
         Map<Integer, Integer> userAnswers = getUserAnswers(sessionId);
-        System.out.println("Найдено ответов: " + userAnswers.size());
 
         if (userAnswers.isEmpty()) {
-            System.err.println("Нет сохранённых ответов для сессии " + sessionId);
             result.setErrorMessage("Нет сохранённых ответов");
             return result;
         }
@@ -34,8 +28,6 @@ public class ResultCalculationService {
         // 2. Загружаем полную структуру теста
         List<Parameter> parameters = loadParameters(test.getId());
         List<Question> questions = loadQuestionsWithAnswers(test.getId());
-        System.out.println("Загружено параметров: " + parameters.size());
-        System.out.println("Загружено вопросов: " + questions.size());
 
         // 3. Создаём маппинг вопрос -> выбранный ответ
         Map<Integer, AnswerOption> selectedAnswers = new HashMap<>();
@@ -61,11 +53,10 @@ public class ResultCalculationService {
             AnswerOption selected = selectedAnswers.get(q.getId());
             if (selected != null) {
                 Map<Integer, Integer> impacts = selected.getParameterImpacts();
-                for (int i = 0; i < parameters.size(); i++) {
-                    String paramName = parameters.get(i).getName();
-                    Integer delta = impacts.get(i);
+                for (Parameter param : parameters) {
+                    Integer delta = impacts.get(param.getId()); // Ключ — реальный ID параметра из БД
                     if (delta != null) {
-                        rawScores.put(paramName, rawScores.get(paramName) + delta);
+                        rawScores.put(param.getName(), rawScores.get(param.getName()) + delta);
                     }
                 }
             }
@@ -75,16 +66,25 @@ public class ResultCalculationService {
         // 5. Масштабируем результаты (если есть калибровка)
         Map<String, Integer> scaledScores = new HashMap<>();
         Map<String, String> interpretations = new HashMap<>();
+        Map<String, String> interpretedCodes = new HashMap<>(); // коды для бинарных шкал
 
         for (Parameter param : parameters) {
             int rawScore = rawScores.get(param.getName());
             int scaledScore = rawScore;
-            String interpretation = "";
+            String interpretation = "Нет интерпретации";
 
             if (param.getScaleType().equals("BINARY")) {
-                // Бинарная шкала: определяем по знаку
-                String code = rawScore > 0 ? "Плюс" : "Минус";
-                interpretation = findBinaryInterpretation(param, code);
+                // Бинарная шкала: выбираем интерпретацию по индексу.
+                // Левый полюс (index 0) — при score <= 0, правый (index 1) — при score > 0.
+                List<ParameterInterpretation> interps = param.getInterpretations();
+                if (!interps.isEmpty()) {
+                    ParameterInterpretation chosen = (rawScore > 0 && interps.size() > 1)
+                            ? interps.get(1) : interps.get(0);
+                    interpretation = chosen.getInterpretationText();
+                    if (chosen.getBinaryValue() != null) {
+                        interpretedCodes.put(param.getName(), chosen.getBinaryValue());
+                    }
+                }
             } else {
                 // Диапазонная шкала: ищем интерпретацию по диапазону
                 interpretation = findRangeInterpretation(param, rawScore);
@@ -99,7 +99,7 @@ public class ResultCalculationService {
         result.setCompleted(true);
 
         // 6. Сохраняем результаты в БД
-        saveResults(sessionId, parameters, rawScores, scaledScores, interpretations);
+        saveResults(sessionId, parameters, rawScores, scaledScores, interpretations, interpretedCodes);
 
         return result;
     }
@@ -110,7 +110,6 @@ public class ResultCalculationService {
     private Map<Integer, Integer> getUserAnswers(int sessionId) throws SQLException {
         Map<Integer, Integer> answers = new HashMap<>();
         String sql = "SELECT question_id, answer_option_id FROM user_answers WHERE session_id = ?";
-        System.out.println("SQL: " + sql + ", sessionId: " + sessionId);
 
         try (Connection conn = DatabaseConnection.getInstance().getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -118,11 +117,7 @@ public class ResultCalculationService {
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 answers.put(rs.getInt("question_id"), rs.getInt("answer_option_id"));
-                System.out.println("  Вопрос " + rs.getInt("question_id") + " -> Ответ " + rs.getInt("answer_option_id"));
             }
-        } catch (SQLException e) {
-            System.err.println("Ошибка при получении ответов: " + e.getMessage());
-            throw e;
         }
         return answers;
     }
@@ -246,18 +241,6 @@ public class ResultCalculationService {
     }
 
     /**
-     * Найти бинарную интерпретацию
-     */
-    private String findBinaryInterpretation(Parameter param, String code) {
-        for (ParameterInterpretation interp : param.getInterpretations()) {
-            if (code.equals(interp.getBinaryValue())) {
-                return interp.getInterpretationText();
-            }
-        }
-        return "Нет интерпретации";
-    }
-
-    /**
      * Найти интерпретацию по диапазону
      */
     private String findRangeInterpretation(Parameter param, int score) {
@@ -272,29 +255,47 @@ public class ResultCalculationService {
     }
 
     /**
-     * Сохранить результаты в БД
+     * Сохранить результаты в БД.
+     * Перед вставкой удаляем старые результаты этой сессии — защита от
+     * повторного вызова (двойное нажатие кнопки "Завершить" и т.п.).
      */
     private void saveResults(int sessionId, List<Parameter> parameters,
                              Map<String, Integer> rawScores,
                              Map<String, Integer> scaledScores,
-                             Map<String, String> interpretations) throws SQLException {
-        String sql = "INSERT INTO test_results (session_id, parameter_id, raw_score, scaled_score, " +
-                "interpreted_code, interpretation_text) VALUES (?, ?, ?, ?, ?, ?)";
+                             Map<String, String> interpretations,
+                             Map<String, String> interpretedCodes) throws SQLException {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // Удаляем ранее сохранённые результаты для этой сессии (если есть)
+                try (PreparedStatement del = conn.prepareStatement(
+                        "DELETE FROM test_results WHERE session_id = ?")) {
+                    del.setInt(1, sessionId);
+                    del.executeUpdate();
+                }
 
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                // Вставляем новые результаты
+                String sql = "INSERT INTO test_results (session_id, parameter_id, raw_score, scaled_score, " +
+                        "interpreted_code, interpretation_text) VALUES (?, ?, ?, ?, ?, ?)";
+                try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                    for (Parameter param : parameters) {
+                        String paramName = param.getName();
+                        pstmt.setInt(1, sessionId);
+                        pstmt.setInt(2, param.getId());
+                        pstmt.setInt(3, rawScores.get(paramName));
+                        pstmt.setInt(4, scaledScores.get(paramName));
+                        pstmt.setString(5, interpretedCodes.getOrDefault(paramName, null));
+                        pstmt.setString(6, interpretations.get(paramName));
+                        pstmt.addBatch();
+                    }
+                    pstmt.executeBatch();
+                }
 
-            for (Parameter param : parameters) {
-                String paramName = param.getName();
-                pstmt.setInt(1, sessionId);
-                pstmt.setInt(2, param.getId());
-                pstmt.setInt(3, rawScores.get(paramName));
-                pstmt.setInt(4, scaledScores.get(paramName));
-                pstmt.setString(5, null); // interpreted_code для диапазонных шкал
-                pstmt.setString(6, interpretations.get(paramName));
-                pstmt.addBatch();
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
             }
-            pstmt.executeBatch();
         }
     }
 }

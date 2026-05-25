@@ -69,10 +69,18 @@ public class ParametersPanel extends JPanel {
         addButton.addActionListener(e -> addParameter());
 
         JButton editButton = new JButton("✏️ Редактировать");
+        editButton.setEnabled(false);
         editButton.addActionListener(e -> editParameter());
 
         JButton removeButton = new JButton("➖ Удалить параметр");
+        removeButton.setEnabled(false);
         removeButton.addActionListener(e -> removeParameter());
+
+        paramsTable.getSelectionModel().addListSelectionListener(e -> {
+            boolean selected = paramsTable.getSelectedRow() != -1;
+            editButton.setEnabled(selected);
+            removeButton.setEnabled(selected);
+        });
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
@@ -135,6 +143,16 @@ public class ParametersPanel extends JPanel {
             String name = nameField.getText().trim().toUpperCase();
             if (name.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Введите название параметра!");
+                return;
+            }
+
+            // Проверка на дублирующееся имя
+            boolean duplicate = controller.getParameters().stream()
+                    .anyMatch(p -> p.getName().equals(name));
+            if (duplicate) {
+                JOptionPane.showMessageDialog(this,
+                        "Параметр с именем «" + name + "» уже существует!",
+                        "Дубликат", JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
@@ -206,9 +224,9 @@ public class ParametersPanel extends JPanel {
         buttonPanel.add(doneButton);
         panel.add(buttonPanel, BorderLayout.SOUTH);
 
-        JDialog dialog = new JDialog();
-        dialog.setTitle("Интерпретации для параметра");
-        dialog.setModal(true);
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this),
+                "Интерпретации для параметра",
+                java.awt.Dialog.ModalityType.APPLICATION_MODAL);
         dialog.setContentPane(panel);
         dialog.setSize(400, 400);
         dialog.setLocationRelativeTo(this);
@@ -264,9 +282,172 @@ public class ParametersPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Выберите параметр для редактирования!");
             return;
         }
-        JOptionPane.showMessageDialog(this,
-                "Редактирование параметра будет в следующей версии.\nПока что удалите и создайте заново.",
-                "Информация", JOptionPane.INFORMATION_MESSAGE);
+
+        Parameter param = controller.getParameter(row);
+
+        // Шаг 1: редактирование названия (тип шкалы менять нельзя — сломает ответы)
+        JTextField nameField = new JTextField(param.getName(), 15);
+        String typeDisplay = param.getScaleType().equals("BINARY") ? "Бинарная" : "Диапазонная";
+        JLabel typeLabel = new JLabel(typeDisplay + "  (изменить нельзя)");
+        typeLabel.setForeground(Color.GRAY);
+
+        JPanel namePanel = new JPanel(new GridLayout(0, 2, 5, 5));
+        namePanel.add(new JLabel("Название параметра:"));
+        namePanel.add(nameField);
+        namePanel.add(new JLabel("Тип шкалы:"));
+        namePanel.add(typeLabel);
+
+        int r = JOptionPane.showConfirmDialog(this, namePanel,
+                "Редактирование параметра", JOptionPane.OK_CANCEL_OPTION);
+        if (r != JOptionPane.OK_OPTION) return;
+
+        String name = nameField.getText().trim().toUpperCase();
+        if (name.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Введите название параметра!");
+            return;
+        }
+
+        // Проверка на дублирующееся имя (не считая сам редактируемый параметр)
+        final int currentRow = row;
+        boolean duplicate = false;
+        java.util.List<main.java.com.psychotest.model.Parameter> params = controller.getParameters();
+        for (int i = 0; i < params.size(); i++) {
+            if (i != currentRow && params.get(i).getName().equals(name)) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (duplicate) {
+            JOptionPane.showMessageDialog(this,
+                    "Параметр с именем «" + name + "» уже существует!",
+                    "Дубликат", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Шаг 2: редактирование интерпретаций
+        List<ParameterInterpretation> newInterpretations;
+        if (param.getScaleType().equals("BINARY")) {
+            newInterpretations = editBinaryInterpretations(param.getInterpretations());
+            if (newInterpretations == null) return; // пользователь отменил
+        } else {
+            newInterpretations = new ArrayList<>(param.getInterpretations());
+            editRangeInterpretationsInPlace(newInterpretations);
+        }
+
+        controller.updateParameter(row, name, newInterpretations);
+    }
+
+    /** Возвращает новый список бинарных интерпретаций с предзаполнением, или null если отменено */
+    private List<ParameterInterpretation> editBinaryInterpretations(List<ParameterInterpretation> current) {
+        String leftVal = "", leftDesc = "", rightVal = "", rightDesc = "";
+        if (current.size() >= 1) {
+            leftVal  = current.get(0).getBinaryValue() != null       ? current.get(0).getBinaryValue()       : "";
+            leftDesc = current.get(0).getInterpretationText() != null ? current.get(0).getInterpretationText() : "";
+        }
+        if (current.size() >= 2) {
+            rightVal  = current.get(1).getBinaryValue() != null       ? current.get(1).getBinaryValue()       : "";
+            rightDesc = current.get(1).getInterpretationText() != null ? current.get(1).getInterpretationText() : "";
+        }
+
+        JTextField leftValueField  = new JTextField(leftVal, 5);
+        JTextArea  leftDescArea    = new JTextArea(leftDesc, 3, 20);
+        leftDescArea.setLineWrap(true);
+        JTextField rightValueField = new JTextField(rightVal, 5);
+        JTextArea  rightDescArea   = new JTextArea(rightDesc, 3, 20);
+        rightDescArea.setLineWrap(true);
+
+        JPanel panel = new JPanel(new GridLayout(0, 2, 5, 5));
+        panel.add(new JLabel("Левый полюс (код):"));
+        panel.add(leftValueField);
+        panel.add(new JLabel("Описание левого полюса:"));
+        panel.add(new JScrollPane(leftDescArea));
+        panel.add(new JLabel("Правый полюс (код):"));
+        panel.add(rightValueField);
+        panel.add(new JLabel("Описание правого полюса:"));
+        panel.add(new JScrollPane(rightDescArea));
+
+        int result = JOptionPane.showConfirmDialog(this, panel,
+                "Редактирование интерпретаций", JOptionPane.OK_CANCEL_OPTION);
+        if (result != JOptionPane.OK_OPTION) return null;
+
+        List<ParameterInterpretation> updated = new ArrayList<>();
+        String lv = leftValueField.getText().trim().toUpperCase();
+        String ld = leftDescArea.getText().trim();
+        String rv = rightValueField.getText().trim().toUpperCase();
+        String rd = rightDescArea.getText().trim();
+
+        if (!lv.isEmpty() && !ld.isEmpty()) {
+            updated.add(new ParameterInterpretation(lv, ld));
+        }
+        if (!rv.isEmpty() && !rd.isEmpty()) {
+            updated.add(new ParameterInterpretation(rv, rd));
+        }
+        return updated;
+    }
+
+    /** Открывает диалог редактирования диапазонных интерпретаций, изменяя список на месте */
+    private void editRangeInterpretationsInPlace(List<ParameterInterpretation> interpretations) {
+        DefaultListModel<String> listModel = new DefaultListModel<>();
+        // Заполняем текущими интерпретациями
+        for (ParameterInterpretation interp : interpretations) {
+            listModel.addElement(interp.getRangeStart() + "-" + interp.getRangeEnd()
+                    + ": " + interp.getInterpretationText());
+        }
+
+        JList<String> interpList = new JList<>(listModel);
+        JButton addBtn    = new JButton("➕ Добавить");
+        JButton removeBtn = new JButton("➖ Удалить выбранное");
+        JButton doneBtn   = new JButton("✅ Готово");
+
+        JPanel panel = new JPanel(new BorderLayout(5, 5));
+        panel.add(new JScrollPane(interpList), BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout());
+        btnPanel.add(addBtn);
+        btnPanel.add(removeBtn);
+        btnPanel.add(doneBtn);
+        panel.add(btnPanel, BorderLayout.SOUTH);
+
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this),
+                "Диапазонные интерпретации", java.awt.Dialog.ModalityType.APPLICATION_MODAL);
+        dialog.setContentPane(panel);
+        dialog.setSize(450, 400);
+        dialog.setLocationRelativeTo(this);
+
+        addBtn.addActionListener(e -> {
+            JTextField minF = new JTextField(5), maxF = new JTextField(5);
+            JTextArea  descA = new JTextArea(3, 20);
+            descA.setLineWrap(true);
+            JPanel ip = new JPanel(new GridLayout(0, 2, 5, 5));
+            ip.add(new JLabel("Диапазон от:")); ip.add(minF);
+            ip.add(new JLabel("до:"));          ip.add(maxF);
+            ip.add(new JLabel("Интерпретация:")); ip.add(new JScrollPane(descA));
+            if (JOptionPane.showConfirmDialog(dialog, ip, "Добавить интерпретацию",
+                    JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
+                try {
+                    int min = Integer.parseInt(minF.getText().trim());
+                    int max = Integer.parseInt(maxF.getText().trim());
+                    String desc = descA.getText().trim();
+                    if (min > max) { JOptionPane.showMessageDialog(dialog, "min > max!"); return; }
+                    if (desc.isEmpty()) { JOptionPane.showMessageDialog(dialog, "Введите текст!"); return; }
+                    listModel.addElement(min + "-" + max + ": " + desc);
+                    interpretations.add(new ParameterInterpretation(min, max, desc));
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(dialog, "Введите корректные числа!");
+                }
+            }
+        });
+
+        removeBtn.addActionListener(e -> {
+            int sel = interpList.getSelectedIndex();
+            if (sel >= 0 && sel < interpretations.size()) {
+                listModel.remove(sel);
+                interpretations.remove(sel);
+            }
+        });
+
+        doneBtn.addActionListener(e -> dialog.dispose());
+        dialog.setVisible(true);
     }
 
     private void removeParameter() {

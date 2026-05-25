@@ -1,36 +1,31 @@
 package main.java.com.psychotest.controller;
 
+import main.java.com.psychotest.model.Test;
 import main.java.com.psychotest.model.User;
+import main.java.com.psychotest.service.AuthService;
 import main.java.com.psychotest.view.MainWindow;
 import main.java.com.psychotest.view.dialogs.AssignTestDialog;
-import main.java.com.psychotest.view.panels.AllTestsPanel;
-import main.java.com.psychotest.model.Test;
-import javax.swing.JOptionPane;
+import javax.swing.*;
+import java.awt.*;
 import java.util.List;
 
 public class MainWindowController {
-    private MainWindow window;
-    private User currentUser;
-    private TeacherController teacherController;  // ← ДОБАВЬТЕ ЭТО ПОЛЕ
+    private final MainWindow window;
+    private final User currentUser;
+    private final TeacherController teacherController;
+    private final AuthService authService = new AuthService();
 
     public MainWindowController(MainWindow window, User user) {
         this.window = window;
         this.currentUser = user;
-        this.teacherController = new TeacherController(currentUser.getId());  // ← ИНИЦИАЛИЗАЦИЯ
+        this.teacherController = new TeacherController(currentUser.getId());
         attachListeners();
-        showWelcomeMessage();
     }
 
     private void attachListeners() {
         // Обработчики для разных ролей
-        if (currentUser.getRole().equals("ADMIN")) {
-            if (window.getManageUsersItem() != null) {
-                window.getManageUsersItem().addActionListener(e -> manageUsers());
-            }
-            if (window.getManageGroupsItem() != null) {
-                window.getManageGroupsItem().addActionListener(e -> manageGroups());
-            }
-        }
+        // Для администратора слушатели меню уже установлены в MainWindow.setupAdminMenu()
+        // и setupAdminPanels() вызывается оттуда напрямую — дублировать здесь не нужно.
 
         if (currentUser.getRole().equals("TEACHER")) {
             if (window.getCreateTestItem() != null) {
@@ -59,39 +54,11 @@ public class MainWindowController {
         if (window.getExitItem() != null) {
             window.getExitItem().addActionListener(e -> exit());
         }
-    }
 
-    private void showWelcomeMessage() {
-        JOptionPane.showMessageDialog(window,
-                "Добро пожаловать в систему, " + currentUser.getFullName() + "!\n" +
-                        "Ваша роль: " + getRoleName(currentUser.getRole()),
-                "Добро пожаловать",
-                JOptionPane.INFORMATION_MESSAGE);
-    }
-
-    private String getRoleName(String role) {
-        switch (role) {
-            case "ADMIN": return "Администратор";
-            case "TEACHER": return "Преподаватель";
-            case "TAKER": return "Тестируемый";
-            default: return role;
+        // Смена пароля — общий для всех ролей
+        if (window.getChangePasswordItem() != null) {
+            window.getChangePasswordItem().addActionListener(e -> changePassword());
         }
-    }
-
-    // ========== Методы для администратора ==========
-
-    private void manageUsers() {
-        JOptionPane.showMessageDialog(window,
-                "Управление пользователями будет реализовано в следующей версии",
-                "В разработке",
-                JOptionPane.INFORMATION_MESSAGE);
-    }
-
-    private void manageGroups() {
-        JOptionPane.showMessageDialog(window,
-                "Управление группами будет реализовано в следующей версии",
-                "В разработке",
-                JOptionPane.INFORMATION_MESSAGE);
     }
 
     // ========== Методы для преподавателя ==========
@@ -103,8 +70,7 @@ public class MainWindowController {
     }
 
     private void showMyTests() {
-        // Открываем панель "Мои тесты"
-        window.setContentPanel(new AllTestsPanel(teacherController));
+        window.switchToTab(0); // Вкладка "Тесты"
     }
 
     private void showAssignTest() {
@@ -134,30 +100,63 @@ public class MainWindowController {
     }
 
     private void viewResults() {
-        // TODO: Открыть панель результатов
-        JOptionPane.showMessageDialog(window,
-                "Просмотр результатов будет реализован в следующей версии",
-                "В разработке",
-                JOptionPane.INFORMATION_MESSAGE);
+        window.switchToTab(3); // Вкладка "Результаты"
     }
 
     // ========== Методы для тестируемого ==========
 
     private void viewAvailableTests() {
-        JOptionPane.showMessageDialog(window,
-                "Доступные тесты будут отображаться здесь",
-                "Информация",
-                JOptionPane.INFORMATION_MESSAGE);
+        window.switchToTab(0); // Вкладка "Доступные тесты"
     }
 
     private void viewMyResults() {
-        JOptionPane.showMessageDialog(window,
-                "Ваши результаты будут отображаться здесь",
-                "Информация",
-                JOptionPane.INFORMATION_MESSAGE);
+        window.switchToTab(1); // Вкладка "Мои результаты"
     }
 
     // ========== Общие методы ==========
+
+    private void changePassword() {
+        JPasswordField currentField = new JPasswordField(20);
+        JPasswordField newField     = new JPasswordField(20);
+        JPasswordField confirmField = new JPasswordField(20);
+
+        JPanel panel = new JPanel(new GridLayout(0, 2, 8, 8));
+        panel.add(new JLabel("Текущий пароль:"));
+        panel.add(currentField);
+        panel.add(new JLabel("Новый пароль:"));
+        panel.add(newField);
+        panel.add(new JLabel("Подтвердите новый пароль:"));
+        panel.add(confirmField);
+
+        int result = JOptionPane.showConfirmDialog(window, panel,
+                "Смена пароля", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (result != JOptionPane.OK_OPTION) return;
+
+        String current = new String(currentField.getPassword());
+        String newPass  = new String(newField.getPassword());
+        String confirm  = new String(confirmField.getPassword());
+
+        if (newPass.length() < 4) {
+            JOptionPane.showMessageDialog(window,
+                    "Новый пароль должен содержать не менее 4 символов!",
+                    "Ошибка", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if (!newPass.equals(confirm)) {
+            JOptionPane.showMessageDialog(window,
+                    "Пароли не совпадают!", "Ошибка", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        boolean success = authService.changePassword(currentUser.getId(), current, newPass);
+        if (success) {
+            JOptionPane.showMessageDialog(window,
+                    "Пароль успешно изменён!", "Успех", JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(window,
+                    "Текущий пароль введён неверно!", "Ошибка", JOptionPane.ERROR_MESSAGE);
+        }
+    }
 
     private void exit() {
         int confirm = JOptionPane.showConfirmDialog(window,

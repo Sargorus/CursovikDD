@@ -46,16 +46,26 @@ public class GroupsPanel extends JPanel {
         addButton.addActionListener(e -> addGroup());
 
         JButton editButton = new JButton("✏️ Редактировать");
+        editButton.setEnabled(false);
         editButton.addActionListener(e -> editGroup());
 
         JButton membersButton = new JButton("👥 Участники");
+        membersButton.setEnabled(false);
         membersButton.addActionListener(e -> manageMembers());
 
         JButton deleteButton = new JButton("🗑️ Удалить");
+        deleteButton.setEnabled(false);
         deleteButton.addActionListener(e -> deleteGroup());
 
         JButton refreshButton = new JButton("🔄 Обновить");
         refreshButton.addActionListener(e -> loadGroups());
+
+        groupsTable.getSelectionModel().addListSelectionListener(e -> {
+            boolean hasSelection = groupsTable.getSelectedRow() != -1;
+            editButton.setEnabled(hasSelection);
+            membersButton.setEnabled(hasSelection);
+            deleteButton.setEnabled(hasSelection);
+        });
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);

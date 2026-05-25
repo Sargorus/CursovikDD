@@ -14,9 +14,11 @@ public class UsersPanel extends JPanel {
     private JTable usersTable;
     private DefaultTableModel tableModel;
     private JTextField searchField;
+    private int currentUserId;
 
-    public UsersPanel(AdminController controller) {
+    public UsersPanel(AdminController controller, int currentUserId) {
         this.controller = controller;
+        this.currentUserId = currentUserId;
         initComponents();
         loadUsers();
     }
@@ -63,13 +65,21 @@ public class UsersPanel extends JPanel {
         addButton.addActionListener(e -> addUser());
 
         JButton editButton = new JButton("✏️ Редактировать");
+        editButton.setEnabled(false);
         editButton.addActionListener(e -> editUser());
 
         JButton deleteButton = new JButton("🗑️ Удалить");
+        deleteButton.setEnabled(false);
         deleteButton.addActionListener(e -> deleteUser());
 
         JButton refreshButton = new JButton("🔄 Обновить");
         refreshButton.addActionListener(e -> loadUsers());
+
+        usersTable.getSelectionModel().addListSelectionListener(e -> {
+            boolean hasSelection = usersTable.getSelectedRow() != -1;
+            editButton.setEnabled(hasSelection);
+            deleteButton.setEnabled(hasSelection);
+        });
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
@@ -141,6 +151,15 @@ public class UsersPanel extends JPanel {
         }
 
         int userId = (int) tableModel.getValueAt(selectedRow, 0);
+
+        if (userId == currentUserId) {
+            JOptionPane.showMessageDialog(this,
+                    "Нельзя редактировать собственную учётную запись через эту панель.\n" +
+                    "Для смены пароля используйте меню «Аккаунт».",
+                    "Запрещено", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
         User user = controller.getUserById(userId);
 
         if (user != null) {
@@ -173,6 +192,15 @@ public class UsersPanel extends JPanel {
             return;
         }
 
+        int userId = (int) tableModel.getValueAt(selectedRow, 0);
+
+        if (userId == currentUserId) {
+            JOptionPane.showMessageDialog(this,
+                    "Нельзя удалить собственную учётную запись!",
+                    "Запрещено", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
         String username = (String) tableModel.getValueAt(selectedRow, 1);
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Вы уверены, что хотите удалить пользователя '" + username + "'?",
@@ -180,7 +208,6 @@ public class UsersPanel extends JPanel {
                 JOptionPane.YES_NO_OPTION);
 
         if (confirm == JOptionPane.YES_OPTION) {
-            int userId = (int) tableModel.getValueAt(selectedRow, 0);
             if (controller.deleteUser(userId)) {
                 JOptionPane.showMessageDialog(this, "Пользователь успешно удалён!");
                 loadUsers();

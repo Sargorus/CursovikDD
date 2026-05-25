@@ -39,19 +39,6 @@ public class TestTakingDialog extends JDialog {
         // Загружаем вопросы теста
         Test test = controller.getFullTest(testId);
 
-        // ДИАГНОСТИКА
-        System.out.println("=== ДИАГНОСТИКА ===");
-        System.out.println("testId: " + testId);
-        System.out.println("test: " + test);
-        if (test != null) {
-            System.out.println("test.getName(): " + test.getName());
-            System.out.println("test.getQuestionBank(): " + test.getQuestionBank());
-            if (test.getQuestionBank() != null) {
-                System.out.println("Количество вопросов: " + test.getQuestionBank().size());
-            }
-        }
-        System.out.println("==================");
-
         if (test != null && test.getQuestionBank() != null && !test.getQuestionBank().isEmpty()) {
             this.questions = test.getQuestionBank();
         } else {
@@ -84,7 +71,6 @@ public class TestTakingDialog extends JDialog {
      */
     private void loadSavedAnswers() {
         savedAnswers = controller.getSavedAnswers(sessionId);
-        System.out.println("Загружено " + savedAnswers.size() + " сохранённых ответов для сессии " + sessionId);
     }
 
     private void initComponents() {
@@ -191,27 +177,27 @@ public class TestTakingDialog extends JDialog {
         prevButton.setEnabled(currentQuestionIndex > 0);
 
         // На последнем вопросе меняем текст кнопки "Далее" на "Завершить"
-        if (currentQuestionIndex == questions.size() - 1) {
+        // и скрываем отдельную кнопку finishButton, чтобы не было двух одинаковых
+        boolean isLastQuestion = currentQuestionIndex == questions.size() - 1;
+        if (isLastQuestion) {
             nextButton.setText("✅ Завершить");
         } else {
             nextButton.setText("Далее ▶");
         }
+        finishButton.setVisible(!isLastQuestion);
     }
 
     private void saveCurrentAnswer() {
         if (questions.isEmpty() || currentQuestionIndex >= questions.size()) {
-            System.out.println("saveCurrentAnswer: вопросы не загружены");
             return;
         }
 
         Question question = questions.get(currentQuestionIndex);
         List<AnswerOption> options = question.getAnswerOptions();
-        System.out.println("Сохранение для сессии " + sessionId + ", вопрос " + question.getId());
 
         for (int i = 0; i < options.size(); i++) {
             if (answerButtons[i].isSelected()) {
                 int answerOptionId = options.get(i).getId();
-                System.out.println("  Выбран ответ " + answerOptionId);
                 savedAnswers.put(question.getId(), answerOptionId);
                 controller.saveAnswer(sessionId, question.getId(), answerOptionId);
                 break;
@@ -289,8 +275,8 @@ public class TestTakingDialog extends JDialog {
     private void confirmAbandon() {
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Вы уверены, что хотите прервать тест?\n" +
-                        "Прогресс будет сохранён, но тест не будет засчитан.\n\n" +
-                        "Вы сможете продолжить позже.",
+                        "Тест не будет засчитан, результат не сохранится.\n" +
+                        "При следующем запуске тест начнётся заново.",
                 "Прерывание теста",
                 JOptionPane.YES_NO_OPTION);
 

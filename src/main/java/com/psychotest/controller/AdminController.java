@@ -1,19 +1,26 @@
 package main.java.com.psychotest.controller;
 
 import main.java.com.psychotest.dao.GroupDAO;
+import main.java.com.psychotest.dao.TestDAO;
 import main.java.com.psychotest.dao.UserDAO;
 import main.java.com.psychotest.model.Group;
+import main.java.com.psychotest.model.Test;
+import main.java.com.psychotest.model.TestState;
 import main.java.com.psychotest.model.User;
 
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class AdminController {
     private UserDAO userDAO;
     private GroupDAO groupDAO;
+    private TestDAO testDAO;
 
     public AdminController() {
         this.userDAO = new UserDAO();
         this.groupDAO = new GroupDAO();
+        this.testDAO = new TestDAO();
     }
 
     // ========== Управление пользователями ==========
@@ -50,12 +57,7 @@ public class AdminController {
     }
 
     public boolean updateUserPassword(int id, String newPasswordHash) {
-        User user = userDAO.findById(id);
-        if (user != null) {
-            user.setPasswordHash(newPasswordHash);
-            return userDAO.update(user);
-        }
-        return false;
+        return userDAO.updatePassword(id, newPasswordHash);
     }
 
     public boolean deleteUser(int id) {
@@ -118,6 +120,50 @@ public class AdminController {
 
     public List<Group> getUserGroups(int userId) {
         return groupDAO.findGroupsByUser(userId);
+    }
+
+    // ========== Управление тестами ==========
+
+    public List<Test> getAllTests() {
+        try {
+            return testDAO.findAll();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
+    public boolean deleteTest(int testId) {
+        try {
+            return testDAO.delete(testId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public String getAuthorName(int userId) {
+        User user = userDAO.findById(userId);
+        return user != null ? user.getFullName() : "Неизвестный";
+    }
+
+    /**
+     * Загружает полное состояние теста из БД для редактирования
+     */
+    public TestState loadTestState(int testId) {
+        try {
+            return testDAO.loadFullTestState(testId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Заменяет содержимое существующего теста новым состоянием
+     */
+    public void updateTestContent(int testId, TestState state) throws SQLException {
+        testDAO.replaceTestContent(testId, state);
     }
 
     // ========== Поиск и фильтрация ==========

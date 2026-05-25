@@ -39,11 +39,11 @@ public class TeacherController {
     // ========== Управление тестами ==========
 
     /**
-     * Получить все тесты, созданные преподавателем
+     * Получить тесты, созданные этим преподавателем
      */
     public List<Test> getMyTests() {
         try {
-            return testDAO.findAll();
+            return testDAO.findByTeacher(teacherId);
         } catch (SQLException e) {
             e.printStackTrace();
             return new ArrayList<>();
@@ -114,7 +114,8 @@ public class TeacherController {
      */
     public boolean assignTestToGroup(int testId, int groupId, Date dueDate) {
         try {
-            return testDAO.assignToGroup(testId, teacherId, groupId, new java.sql.Date(dueDate.getTime()));
+            // dueDate может быть null (без срока) — передаём как есть в DAO
+            return testDAO.assignToGroup(testId, teacherId, groupId, dueDate);
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
@@ -134,6 +135,26 @@ public class TeacherController {
     }
 
     // ========== Поиск и фильтрация ==========
+
+    /**
+     * Получить все тесты из БД (для фильтра "Все тесты")
+     */
+    public List<Test> getAllTests() {
+        try {
+            return testDAO.findAll();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Получить имя автора по ID пользователя
+     */
+    public String getAuthorName(int userId) {
+        User user = userDAO.findById(userId);
+        return user != null ? user.getFullName() : "Неизвестный";
+    }
 
     /**
      * Поиск тестов по названию
@@ -193,6 +214,19 @@ public class TeacherController {
     }
 
     /**
+     * Удалить результат сессии (ответы, расчёты и саму сессию)
+     */
+    public boolean deleteResult(int sessionId) {
+        try {
+            sessionDAO.deleteSession(sessionId);
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
      * Получить детальные результаты сессии
      */
     public ResultService.SessionDetail getSessionDetail(int sessionId) {
@@ -218,6 +252,25 @@ public class TeacherController {
 
     public int getTeacherId() {
         return teacherId;
+    }
+
+    /**
+     * Загружает полное состояние теста из БД для редактирования
+     */
+    public TestState loadTestState(int testId) {
+        try {
+            return testDAO.loadFullTestState(testId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Заменяет содержимое существующего теста новым состоянием
+     */
+    public void updateTestContent(int testId, TestState state) throws SQLException {
+        testDAO.replaceTestContent(testId, state);
     }
 
     // ========== Экспорт в Excel ==========

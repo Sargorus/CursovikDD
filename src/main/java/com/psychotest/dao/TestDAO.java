@@ -24,13 +24,12 @@ public class TestDAO {
 
             // 1. Сохраняем тест
             int testId = saveTest(conn, state, teacherId);
-            System.out.println("Сохранён тест: ID=" + testId + ", name=" + state.getTestName());
 
-            // 2. Сохраняем параметры
-            Map<String, Integer> paramIdMap = new HashMap<>();
-            for (Parameter param : state.getParameters()) {
+            // 2. Сохраняем параметры и запоминаем их реальные ID из БД
+            List<Parameter> savedParams = state.getParameters();
+            for (Parameter param : savedParams) {
                 int paramId = saveParameter(conn, testId, param);
-                paramIdMap.put(param.getName(), paramId);
+                param.setId(paramId); // Записываем реальный ID обратно в объект
             }
 
             // 3. Сохраняем вопросы и ответы
@@ -38,19 +37,17 @@ public class TestDAO {
                 int questionId = saveQuestion(conn, testId, question);
                 for (AnswerOption option : question.getAnswerOptions()) {
                     int optionId = saveAnswerOption(conn, questionId, option);
-                    saveImpacts(conn, optionId, option.getParameterImpacts(), state.getParameters());
+                    saveImpacts(conn, optionId, option.getParameterImpacts(), savedParams);
                 }
             }
 
             conn.commit();
-            System.out.println("Тест успешно сохранён в БД!");
             return testId;
 
         } catch (SQLException e) {
             if (conn != null) {
                 try {
                     conn.rollback();
-                    System.err.println("Транзакция откачена: " + e.getMessage());
                 } catch (SQLException ex) {
                     ex.printStackTrace();
                 }
@@ -60,6 +57,7 @@ public class TestDAO {
             if (conn != null) {
                 try {
                     conn.setAutoCommit(true);
+                    conn.close();
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -147,18 +145,22 @@ public class TestDAO {
     }
 
     private void saveImpacts(Connection conn, int optionId, Map<Integer, Integer> impacts, List<Parameter> parameters) throws SQLException {
+        if (impacts == null || impacts.isEmpty()) return;
+
         String sql = "INSERT INTO answer_parameter_impact (answer_option_id, parameter_id, delta) VALUES (?, ?, ?)";
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             for (Map.Entry<Integer, Integer> entry : impacts.entrySet()) {
                 int paramIndex = entry.getKey();
                 int delta = entry.getValue();
                 if (paramIndex >= 0 && paramIndex < parameters.size()) {
-                    // Нужно получить реальный ID параметра из БД
-                    // В текущей реализации мы не храним маппинг индексов, поэтому пока пропускаем
-                    // TODO: нужен маппинг индекс -> реальный ID параметра
-                    System.out.println("  Влияние: параметр индекс=" + paramIndex + ", delta=" + delta);
+                    int paramId = parameters.get(paramIndex).getId(); // Реальный ID из БД
+                    pstmt.setInt(1, optionId);
+                    pstmt.setInt(2, paramId);
+                    pstmt.setInt(3, delta);
+                    pstmt.addBatch();
                 }
             }
+            pstmt.executeBatch();
         }
     }
 
@@ -181,7 +183,9 @@ public class TestDAO {
                 test.setName(rs.getString("name"));
                 test.setDescription(rs.getString("description"));
                 test.setCreatedBy(rs.getInt("created_by"));
-                test.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                if (rs.getTimestamp("created_at") != null) {
+                    test.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                }
                 test.setQuestionsPerSession(rs.getInt("questions_per_session"));
                 return test;
             }
@@ -334,14 +338,179 @@ public class TestDAO {
         }
     }
 
+    // ========== РЕДАКТИРОВАНИЕ (замена контента теста) ==========
+
+    /**
+     * Обновляет существующий тест: заменяет все параметры, вопросы, ответы и влияния.
+     * Запись test (name, description, questions_per_session) обновляется на месте,
+     * поэтому старые сессии/результаты, ссылающиеся на тот же testId, остаются валидными.
+     */
+    public void replaceTestContent(int testId, TestState state) throws SQLException {
+        Connection conn = null;
+        try {
+            conn = DatabaseConnection.getInstance().getConnection();
+            conn.setAutoCommit(false);
+
+            // 1. Обновляем базовые поля теста
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "UPDATE tests SET name = ?, description = ?, questions_per_session = ? WHERE id = ?")) {
+                pstmt.setString(1, state.getTestName());
+                pstmt.setString(2, state.getTestDescription());
+                pstmt.setInt(3, state.getQuestionsPerSession());
+                pstmt.setInt(4, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 2. Удаляем старые влияния → ответы → вопросы (через явный порядок)
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM answer_parameter_impact WHERE answer_option_id IN " +
+                    "(SELECT ao.id FROM answer_options ao JOIN questions q ON ao.question_id = q.id WHERE q.test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM answer_options WHERE question_id IN (SELECT id FROM questions WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement("DELETE FROM questions WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 3. Удаляем старые интерпретации → параметры
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM parameter_interpretations WHERE parameter_id IN " +
+                    "(SELECT id FROM parameters WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement("DELETE FROM parameters WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 4. Сохраняем новые параметры (получаем реальные ID)
+            List<Parameter> savedParams = state.getParameters();
+            for (Parameter param : savedParams) {
+                int paramId = saveParameter(conn, testId, param);
+                param.setId(paramId);
+            }
+
+            // 5. Сохраняем новые вопросы, ответы и влияния
+            for (Question question : state.getQuestions()) {
+                int questionId = saveQuestion(conn, testId, question);
+                for (AnswerOption option : question.getAnswerOptions()) {
+                    int optionId = saveAnswerOption(conn, questionId, option);
+                    saveImpacts(conn, optionId, option.getParameterImpacts(), savedParams);
+                }
+            }
+
+            conn.commit();
+
+        } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
+            throw e;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException e) { e.printStackTrace(); }
+            }
+        }
+    }
+
     // ========== УДАЛЕНИЕ ==========
 
     public boolean delete(int testId) throws SQLException {
-        String sql = "DELETE FROM tests WHERE id = ?";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, testId);
-            return pstmt.executeUpdate() > 0;
+        Connection conn = null;
+        try {
+            conn = DatabaseConnection.getInstance().getConnection();
+            conn.setAutoCommit(false);
+
+            // 1. Удаляем результаты и ответы пользователей из сессий этого теста
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM test_results WHERE session_id IN " +
+                    "(SELECT id FROM test_sessions WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM user_answers WHERE session_id IN " +
+                    "(SELECT id FROM test_sessions WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 2. Удаляем сессии и назначения теста
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM test_sessions WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM test_assignments WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 3. Удаляем влияния → ответы → вопросы
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM answer_parameter_impact WHERE answer_option_id IN " +
+                    "(SELECT ao.id FROM answer_options ao JOIN questions q ON ao.question_id = q.id WHERE q.test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM answer_options WHERE question_id IN (SELECT id FROM questions WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM questions WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 4. Удаляем интерпретации → параметры
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM parameter_interpretations WHERE parameter_id IN " +
+                    "(SELECT id FROM parameters WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM parameters WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 5. Удаляем сам тест
+            int deleted;
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM tests WHERE id = ?")) {
+                pstmt.setInt(1, testId);
+                deleted = pstmt.executeUpdate();
+            }
+
+            conn.commit();
+            return deleted > 0;
+
+        } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
+            throw e;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException e) { e.printStackTrace(); }
+            }
         }
     }
 
@@ -360,7 +529,9 @@ public class TestDAO {
                 test.setName(rs.getString("name"));
                 test.setDescription(rs.getString("description"));
                 test.setCreatedBy(rs.getInt("created_by"));
-                test.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                if (rs.getTimestamp("created_at") != null) {
+                    test.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                }
                 test.setQuestionsPerSession(rs.getInt("questions_per_session"));
                 tests.add(test);
             }
@@ -380,7 +551,9 @@ public class TestDAO {
                 test.setName(rs.getString("name"));
                 test.setDescription(rs.getString("description"));
                 test.setCreatedBy(rs.getInt("created_by"));
-                test.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                if (rs.getTimestamp("created_at") != null) {
+                    test.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                }
                 test.setQuestionsPerSession(rs.getInt("questions_per_session"));
                 tests.add(test);
             }
@@ -413,7 +586,11 @@ public class TestDAO {
             pstmt.setInt(1, testId);
             pstmt.setInt(2, assignedBy);
             pstmt.setInt(3, groupId);
-            pstmt.setDate(4, new java.sql.Date(dueDate.getTime()));
+            if (dueDate != null) {
+                pstmt.setDate(4, new java.sql.Date(dueDate.getTime()));
+            } else {
+                pstmt.setNull(4, Types.DATE);
+            }
             return pstmt.executeUpdate() > 0;
         }
     }

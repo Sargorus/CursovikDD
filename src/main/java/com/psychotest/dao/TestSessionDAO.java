@@ -23,27 +23,43 @@ public class TestSessionDAO {
             pstmt.setInt(2, testId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
-                int id = rs.getInt(1);
-                System.out.println("Создана сессия ID=" + id + " для user=" + userId + ", test=" + testId);
-                return id;
+                return rs.getInt(1);
             }
         }
         return -1;
     }
 
     /**
-     * Сохранить ответ пользователя
+     * Сохранить (или обновить) ответ пользователя.
+     * Использует DELETE + INSERT вместо ON CONFLICT, чтобы не зависеть
+     * от наличия UNIQUE-ограничения на (session_id, question_id).
+     * DELETE ничего не делает, если ответ ещё не был дан — всё безопасно.
      */
     public void saveAnswer(int sessionId, int questionId, int answerOptionId) throws SQLException {
-        String sql = "INSERT INTO user_answers (session_id, question_id, answer_option_id, answered_at) " +
-                "VALUES (?, ?, ?, CURRENT_TIMESTAMP)";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, sessionId);
-            pstmt.setInt(2, questionId);
-            pstmt.setInt(3, answerOptionId);
-            int rows = pstmt.executeUpdate();
-            System.out.println("Сохранён ответ: rows=" + rows + ", session=" + sessionId + ", question=" + questionId);
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // Удаляем старый ответ на этот вопрос (если есть)
+                try (PreparedStatement del = conn.prepareStatement(
+                        "DELETE FROM user_answers WHERE session_id = ? AND question_id = ?")) {
+                    del.setInt(1, sessionId);
+                    del.setInt(2, questionId);
+                    del.executeUpdate();
+                }
+                // Вставляем новый ответ
+                try (PreparedStatement ins = conn.prepareStatement(
+                        "INSERT INTO user_answers (session_id, question_id, answer_option_id, answered_at) " +
+                        "VALUES (?, ?, ?, CURRENT_TIMESTAMP)")) {
+                    ins.setInt(1, sessionId);
+                    ins.setInt(2, questionId);
+                    ins.setInt(3, answerOptionId);
+                    ins.executeUpdate();
+                }
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            }
         }
     }
 
@@ -57,6 +73,37 @@ public class TestSessionDAO {
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, sessionId);
             pstmt.executeUpdate();
+        }
+    }
+
+    /**
+     * Полностью удаляет сессию и все связанные данные:
+     * результаты по параметрам, ответы пользователя, саму запись сессии.
+     */
+    public void deleteSession(int sessionId) throws SQLException {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                try (PreparedStatement pstmt = conn.prepareStatement(
+                        "DELETE FROM test_results WHERE session_id = ?")) {
+                    pstmt.setInt(1, sessionId);
+                    pstmt.executeUpdate();
+                }
+                try (PreparedStatement pstmt = conn.prepareStatement(
+                        "DELETE FROM user_answers WHERE session_id = ?")) {
+                    pstmt.setInt(1, sessionId);
+                    pstmt.executeUpdate();
+                }
+                try (PreparedStatement pstmt = conn.prepareStatement(
+                        "DELETE FROM test_sessions WHERE id = ?")) {
+                    pstmt.setInt(1, sessionId);
+                    pstmt.executeUpdate();
+                }
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            }
         }
     }
 

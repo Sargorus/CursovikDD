@@ -12,6 +12,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,14 +56,23 @@ public class TakerController {
     }
 
     /**
-     * Получить полное состояние теста для прохождения
+     * Получить полное состояние теста для прохождения.
+     * Если у теста задан лимит questionsPerSession > 0 и вопросов в банке больше,
+     * возвращает случайную выборку нужного размера.
      */
     public Test getFullTest(int testId) {
         try {
             Test test = testDAO.findById(testId);
             if (test != null) {
-                // Загружаем вопросы для теста
                 List<Question> questions = testDAO.loadQuestionsForTest(testId);
+
+                int limit = test.getQuestionsPerSession();
+                if (limit > 0 && questions.size() > limit) {
+                    // Случайная выборка без повторений
+                    Collections.shuffle(questions);
+                    questions = questions.subList(0, limit);
+                }
+
                 test.setQuestionBank(questions);
             }
             return test;
@@ -79,16 +89,8 @@ public class TakerController {
      */
     public int startTest(int testId) {
         try {
-            System.out.println("=== НАЧАЛО ТЕСТА ===");
-            System.out.println("userId: " + userId);
-            System.out.println("testId: " + testId);
-
-            int sessionId = sessionDAO.createSession(userId, testId);
-            System.out.println("sessionId: " + sessionId);
-
-            return sessionId;
+            return sessionDAO.createSession(userId, testId);
         } catch (SQLException e) {
-            System.err.println("Ошибка при создании сессии: " + e.getMessage());
             e.printStackTrace();
             return -1;
         }
@@ -102,6 +104,8 @@ public class TakerController {
             sessionDAO.saveAnswer(sessionId, questionId, answerOptionId);
             return true;
         } catch (SQLException e) {
+            System.err.println("Ошибка сохранения ответа: session=" + sessionId
+                    + " question=" + questionId + " option=" + answerOptionId);
             e.printStackTrace();
             return false;
         }
@@ -114,35 +118,24 @@ public class TakerController {
         try {
             // Получаем сессию
             TestSession session = sessionDAO.getSession(sessionId);
-            if (session == null) {
-                System.err.println("Сессия не найдена: " + sessionId);
-                return null;
-            }
+            if (session == null) return null;
 
             // Получаем полный тест
             Test test = getFullTest(session.getTestId());
-            if (test == null) {
-                System.err.println("Тест не найден: " + session.getTestId());
-                return null;
-            }
+            if (test == null) return null;
 
             // Рассчитываем результаты
             TestResult result = resultService.calculateResults(sessionId, test);
-            if (result == null) {
-                System.err.println("Результат не рассчитан");
-                return null;
-            }
+            if (result == null) return null;
 
             // Завершаем сессию
             sessionDAO.completeSession(sessionId);
 
             return result;
         } catch (SQLException e) {
-            System.err.println("SQL ошибка: " + e.getMessage());
             e.printStackTrace();
             return null;
         } catch (Exception e) {
-            System.err.println("Общая ошибка: " + e.getMessage());
             e.printStackTrace();
             return null;
         }

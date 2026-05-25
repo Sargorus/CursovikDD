@@ -3,17 +3,15 @@ package main.java.com.psychotest.util;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+// DbConfig находится в том же пакете — import не нужен
 
 public class DatabaseConnection {
     private static DatabaseConnection instance;
-    private Connection connection;
     private String url;
     private String username;
     private String password;
-    private boolean isTestMode = false;
 
     private DatabaseConnection() {
-        // Для тестирования можно использовать переменные окружения или properties
         this.url = System.getProperty("DB_URL", "jdbc:postgresql://localhost:5432/psychotest_db");
         this.username = System.getProperty("DB_USER", "postgres");
         this.password = System.getProperty("DB_PASSWORD", "123");
@@ -26,45 +24,43 @@ public class DatabaseConnection {
         }
     }
 
-    public static DatabaseConnection getInstance() {
+    public static synchronized DatabaseConnection getInstance() {
         if (instance == null) {
             instance = new DatabaseConnection();
         }
         return instance;
     }
 
+    /**
+     * Возвращает новое подключение к БД.
+     * Каждый вызывающий код обязан закрыть соединение сам
+     * (через try-with-resources или явный conn.close()).
+     */
     public Connection getConnection() throws SQLException {
-        try {
-            if (connection == null || connection.isClosed()) {
-                connection = DriverManager.getConnection(url, username, password);
-                connection.setAutoCommit(true);  // ← ДОЛЖНО БЫТЬ true
-                System.out.println("✓ Connected to PostgreSQL database!");
-            }
-            return connection;
-        } catch (SQLException e) {
-            System.err.println("✗ Connection failed: " + e.getMessage());
-            throw e;
-        }
+        Connection conn = DriverManager.getConnection(url, username, password);
+        conn.setAutoCommit(true);
+        return conn;
+    }
+
+    /**
+     * Применяет настройки из DbConfig.
+     * Вызывается из Main перед первым обращением к БД.
+     */
+    public void configure(DbConfig config) {
+        this.url      = config.buildUrl();
+        this.username = config.getDbUser();
+        this.password = config.getDbPassword();
     }
 
     public void setTestMode(boolean testMode) {
-        this.isTestMode = testMode;
         if (testMode) {
             this.url = "jdbc:postgresql://localhost:5432/psychotest_test_db";
+        } else {
+            this.url = System.getProperty("DB_URL", "jdbc:postgresql://localhost:5432/psychotest_db");
         }
     }
 
-    public void closeConnection() {
-        try {
-            if (connection != null && !connection.isClosed()) {
-                connection.close();
-                System.out.println("Database connection closed.");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
+    /** Устаревший вспомогательный метод — соединение уже закрывается через try-with-resources. */
     public void closeConnection(Connection conn) {
         try {
             if (conn != null && !conn.isClosed()) {

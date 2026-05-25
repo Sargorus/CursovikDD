@@ -47,7 +47,13 @@ public class MyResultsPanel extends JPanel {
         resultsTable = new JTable(tableModel);
         resultsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         resultsTable.getSelectionModel().addListSelectionListener(e -> {
-            viewDetailButton.setEnabled(resultsTable.getSelectedRow() != -1);
+            int row = resultsTable.getSelectedRow();
+            if (row != -1) {
+                String status = (String) tableModel.getValueAt(row, 3);
+                viewDetailButton.setEnabled("Завершён".equals(status));
+            } else {
+                viewDetailButton.setEnabled(false);
+            }
         });
 
         resultsTable.getColumnModel().getColumn(0).setMaxWidth(50);
@@ -93,8 +99,8 @@ public class MyResultsPanel extends JPanel {
     }
 
     private String getTestName(int testId) {
-        // TODO: загружать название теста из БД
-        return "Тест #" + testId;
+        String name = controller.getTestName(testId);
+        return (name != null && !name.isEmpty()) ? name : "Тест #" + testId;
     }
 
     private String getStatusText(String status) {
@@ -242,7 +248,10 @@ public class MyResultsPanel extends JPanel {
                 String paramName = entry.getKey();
                 sb.append("📊 ").append(paramName).append(": ").append(entry.getValue()).append("\n");
                 if (result.getInterpretations() != null) {
-                    sb.append("   ").append(result.getInterpretations().get(paramName)).append("\n");
+                    String interp = result.getInterpretations().get(paramName);
+                    if (interp != null && !interp.isEmpty()) {
+                        sb.append("   ").append(interp).append("\n");
+                    }
                 }
                 sb.append("\n");
             }

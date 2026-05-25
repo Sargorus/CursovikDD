@@ -10,6 +10,7 @@ public class TestInfoPanel extends JPanel {
     private TestConstructorController controller;
     private JTextField nameField;
     private JTextArea descArea;
+    private JSpinner questionsPerSessionSpinner;
 
     public TestInfoPanel(TestConstructorController controller) {
         this.controller = controller;
@@ -59,8 +60,29 @@ public class TestInfoPanel extends JPanel {
         JScrollPane scrollPane = new JScrollPane(descArea);
         formPanel.add(scrollPane, gbc);
 
-        // Подсказка
+        // Вопросов в сессии
         gbc.gridy = 3;
+        gbc.gridx = 0;
+        gbc.gridwidth = 1;
+        formPanel.add(new JLabel("Вопросов в сессии:"), gbc);
+
+        gbc.gridx = 1;
+        questionsPerSessionSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 999, 1));
+        questionsPerSessionSpinner.setPreferredSize(new Dimension(80, 25));
+        ((JSpinner.DefaultEditor) questionsPerSessionSpinner.getEditor()).getTextField().setColumns(5);
+        formPanel.add(questionsPerSessionSpinner, gbc);
+
+        // Подсказка к спиннеру
+        gbc.gridy = 4;
+        gbc.gridx = 0;
+        gbc.gridwidth = 2;
+        JLabel spinnerHint = new JLabel("0 = показывать все вопросы; любое другое число — случайная выборка из банка");
+        spinnerHint.setFont(new Font("Arial", Font.ITALIC, 11));
+        spinnerHint.setForeground(Color.GRAY);
+        formPanel.add(spinnerHint, gbc);
+
+        // Подсказка
+        gbc.gridy = 5;
         gbc.gridx = 0;
         gbc.gridwidth = 2;
         JLabel hintLabel = new JLabel("Совет: Дайте тесту понятное название, чтобы ученики могли легко его найти");
@@ -74,8 +96,12 @@ public class TestInfoPanel extends JPanel {
     private void loadData() {
         nameField.setText(controller.getTestName());
         descArea.setText(controller.getTestDescription());
+        questionsPerSessionSpinner.setValue(controller.getQuestionsPerSession());
 
         // Добавляем слушатели для автоматического обновления состояния через контроллер
+        questionsPerSessionSpinner.addChangeListener(e ->
+                controller.setQuestionsPerSession((int) questionsPerSessionSpinner.getValue()));
+
         nameField.getDocument().addDocumentListener(new DocumentListener() {
             public void changedUpdate(DocumentEvent e) { update(); }
             public void insertUpdate(DocumentEvent e) { update(); }
