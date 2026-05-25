@@ -7,6 +7,7 @@ import java.awt.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 
 public class TestTakingDialog extends JDialog {
     private TakerController controller;
@@ -250,7 +251,9 @@ public class TestTakingDialog extends JDialog {
                     try {
                         TestResult result = get();
                         if (result != null && result.isCompleted()) {
-                            showResultDialog(result);
+                            JOptionPane.showMessageDialog(TestTakingDialog.this,
+                                    "Тест завершён!\nСпасибо за прохождение.",
+                                    "Тест завершён", JOptionPane.INFORMATION_MESSAGE);
                             dispose();
                         } else {
                             String errorMsg = result != null ? result.getErrorMessage() : "Неизвестная ошибка";
@@ -286,110 +289,6 @@ public class TestTakingDialog extends JDialog {
             controller.abandonTest(sessionId);
             dispose();
         }
-    }
-
-    private void showResultDialog(TestResult result) {
-        // Создаём диалог с результатами - используем this как родительское окно
-        JDialog dialog = new JDialog(this, "Результаты теста: " + result.getTestName(), true);
-        dialog.setSize(500, 400);
-        dialog.setLocationRelativeTo(this);
-
-        JTabbedPane tabbedPane = new JTabbedPane();
-
-        // Вкладка с результатами по параметрам
-        JPanel paramsPanel = createParametersPanel(result);
-        tabbedPane.addTab("📊 Результаты", paramsPanel);
-
-        // Вкладка с полной интерпретацией
-        JPanel interpretationPanel = createInterpretationPanel(result);
-        tabbedPane.addTab("📝 Интерпретация", interpretationPanel);
-
-        dialog.add(tabbedPane, BorderLayout.CENTER);
-
-        // Кнопка закрытия
-        JPanel buttonPanel = new JPanel();
-        JButton closeButton = new JButton("Закрыть");
-        closeButton.addActionListener(e -> dialog.dispose());
-        buttonPanel.add(closeButton);
-        dialog.add(buttonPanel, BorderLayout.SOUTH);
-
-        dialog.setVisible(true);
-    }
-
-    private JPanel createParametersPanel(TestResult result) {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-
-        if (result.getScaledScores() == null || result.getScaledScores().isEmpty()) {
-            JLabel emptyLabel = new JLabel("Нет данных о результатах", SwingConstants.CENTER);
-            panel.add(emptyLabel, BorderLayout.CENTER);
-            return panel;
-        }
-
-        // Создаём таблицу
-        String[] columns = {"Параметр", "Результат", "Интерпретация"};
-        Object[][] data = new Object[result.getScaledScores().size()][3];
-
-        int i = 0;
-        for (Map.Entry<String, Integer> entry : result.getScaledScores().entrySet()) {
-            String paramName = entry.getKey();
-            data[i][0] = paramName;
-            data[i][1] = entry.getValue();
-            data[i][2] = result.getInterpretations() != null ?
-                    result.getInterpretations().get(paramName) : "";
-            i++;
-        }
-
-        JTable table = new JTable(data, columns);
-        table.setRowHeight(30);
-        table.getColumnModel().getColumn(0).setPreferredWidth(100);
-        table.getColumnModel().getColumn(1).setPreferredWidth(80);
-        table.getColumnModel().getColumn(2).setPreferredWidth(250);
-
-        JScrollPane scrollPane = new JScrollPane(table);
-        panel.add(scrollPane, BorderLayout.CENTER);
-
-        return panel;
-    }
-
-    private JPanel createInterpretationPanel(TestResult result) {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-
-        JTextArea interpretationArea = new JTextArea();
-        interpretationArea.setEditable(false);
-        interpretationArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-        interpretationArea.setLineWrap(true);
-        interpretationArea.setWrapStyleWord(true);
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("═══════════════════════════════════════════════════════════════════\n");
-        sb.append("                    РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ                        \n");
-        sb.append("═══════════════════════════════════════════════════════════════════\n\n");
-        sb.append("Тест: ").append(result.getTestName()).append("\n");
-        sb.append("───────────────────────────────────────────────────────────────────\n\n");
-
-        if (result.getScaledScores() != null) {
-            for (Map.Entry<String, Integer> entry : result.getScaledScores().entrySet()) {
-                String paramName = entry.getKey();
-                sb.append("📊 ").append(paramName).append(": ").append(entry.getValue()).append("\n");
-                if (result.getInterpretations() != null) {
-                    String interpretation = result.getInterpretations().get(paramName);
-                    if (interpretation != null && !interpretation.isEmpty()) {
-                        sb.append("   ").append(interpretation).append("\n");
-                    }
-                }
-                sb.append("\n");
-            }
-        }
-
-        interpretationArea.setText(sb.toString());
-        interpretationArea.setCaretPosition(0);
-
-        JScrollPane scrollPane = new JScrollPane(interpretationArea);
-        panel.add(scrollPane, BorderLayout.CENTER);
-
-        return panel;
     }
 
     private String escapeHtml(String text) {

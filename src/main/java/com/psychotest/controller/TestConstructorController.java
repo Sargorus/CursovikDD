@@ -240,6 +240,21 @@ public class TestConstructorController {
     // ========== Сохранение в БД ==========
 
     /**
+     * Возвращает количество завершённых сессий для редактируемого теста.
+     * В режиме создания всегда возвращает 0.
+     * Используется в UI для предупреждения о потере результатов.
+     */
+    public int countExistingResults() {
+        if (!isEditMode()) return 0;
+        try {
+            return new TestDAO().countCompletedSessions(editingTestId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
      * Сохраняет тест в БД.
      * В режиме редактирования заменяет содержимое существующего теста и возвращает его ID.
      * При создании нового — создаёт запись и возвращает новый ID.
@@ -256,5 +271,18 @@ public class TestConstructorController {
             draftService.clearDraft(teacherId);
             return testId;
         }
+    }
+
+    /**
+     * Сохраняет текущее состояние теста как НОВЫЙ тест, не трогая оригинал.
+     * Используется в режиме редактирования, когда нужно создать новую версию
+     * без потери истории результатов старого теста.
+     *
+     * @return ID нового теста
+     */
+    public int saveAsNewTest() throws SQLException {
+        TestPersistenceService persistenceService = new TestPersistenceService();
+        // Всегда создаёт новую запись в БД, вне зависимости от режима
+        return persistenceService.saveTest(testState, teacherId);
     }
 }
