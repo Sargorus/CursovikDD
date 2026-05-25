@@ -61,7 +61,7 @@ public class ResultDetailDialog extends JDialog {
     private void exportToExcel() {
         JFileChooser fileChooser = new JFileChooser();
         String defaultFileName = "result_" + userName + "_" +
-                java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+                java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xls";
         fileChooser.setSelectedFile(new java.io.File(defaultFileName));
         fileChooser.setDialogTitle("Сохранить отчёт как...");
 
@@ -70,7 +70,7 @@ public class ResultDetailDialog extends JDialog {
         }
 
         String rawPath = fileChooser.getSelectedFile().getAbsolutePath();
-        final String filePath = rawPath.endsWith(".xlsx") ? rawPath : rawPath + ".xlsx";
+        final String filePath = rawPath.endsWith(".xls") ? rawPath : rawPath + ".xls";
 
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 

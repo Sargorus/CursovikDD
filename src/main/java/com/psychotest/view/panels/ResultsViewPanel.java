@@ -295,7 +295,7 @@ public class ResultsViewPanel extends JPanel {
         }
 
         JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setSelectedFile(new File("report.xlsx"));
+        fileChooser.setSelectedFile(new File("report.xls"));
         fileChooser.setDialogTitle("Сохранить отчёт как...");
 
         if (fileChooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
@@ -303,7 +303,7 @@ public class ResultsViewPanel extends JPanel {
         }
 
         String basePath = fileChooser.getSelectedFile().getAbsolutePath();
-        String finalPath = basePath.endsWith(".xlsx") ? basePath : basePath + ".xlsx";
+        String finalPath = basePath.endsWith(".xls") ? basePath : basePath + ".xls";
         // Если выбрана строка-заглушка (ID не Integer) — сбрасываем выбор
         boolean rowIsReal = selectedRow >= 0 && tableModel.getValueAt(selectedRow, 0) instanceof Integer;
         if (!rowIsReal && option != 0) {
