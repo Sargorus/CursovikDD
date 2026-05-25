@@ -18,6 +18,7 @@ public class ResultsViewPanel extends JPanel {
     private DefaultTableModel tableModel;
     private JButton exportButton;
     private JButton viewDetailButton;
+    private JButton deleteResultButton;
     private JLabel currentTestLabel;
     private int preSelectedTestId = -1;
     private String preSelectedTestName = "";
@@ -96,6 +97,7 @@ public class ResultsViewPanel extends JPanel {
             // Включаем только когда выбрана реальная строка (не строка-заглушка)
             boolean rowIsReal = row != -1 && tableModel.getValueAt(row, 0) instanceof Integer;
             viewDetailButton.setEnabled(rowIsReal);
+            deleteResultButton.setEnabled(rowIsReal);
             updateExportButton();
         });
 
@@ -114,11 +116,16 @@ public class ResultsViewPanel extends JPanel {
         viewDetailButton.setEnabled(false);
         viewDetailButton.addActionListener(e -> viewDetail());
 
+        deleteResultButton = new JButton("🗑️ Удалить результат");
+        deleteResultButton.setEnabled(false);
+        deleteResultButton.addActionListener(e -> deleteResult());
+
         exportButton = new JButton("📊 Экспорт в Excel");
         exportButton.setEnabled(false); // включается после выбора теста
         exportButton.addActionListener(e -> exportToExcel());
 
         buttonPanel.add(viewDetailButton);
+        buttonPanel.add(deleteResultButton);
         buttonPanel.add(exportButton);
 
         add(buttonPanel, BorderLayout.SOUTH);
@@ -228,6 +235,38 @@ public class ResultsViewPanel extends JPanel {
             }
         };
         worker.execute();
+    }
+
+    private void deleteResult() {
+        int selectedRow = resultsTable.getSelectedRow();
+        if (selectedRow == -1) return;
+
+        Object idVal = tableModel.getValueAt(selectedRow, 0);
+        if (!(idVal instanceof Integer)) return;
+        int sessionId = (int) idVal;
+        String userName = (String) tableModel.getValueAt(selectedRow, 1);
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Удалить результат тестирования пользователя «" + userName + "»?\n\n" +
+                "Будут удалены: ответы на вопросы, результаты по параметрам\n" +
+                "и запись о прохождении теста. Это действие нельзя отменить.",
+                "Подтверждение удаления",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            boolean success = controller.deleteResult(sessionId);
+            if (success) {
+                JOptionPane.showMessageDialog(this,
+                        "Результат успешно удалён.",
+                        "Готово", JOptionPane.INFORMATION_MESSAGE);
+                loadResults();
+            } else {
+                JOptionPane.showMessageDialog(this,
+                        "Ошибка при удалении результата!",
+                        "Ошибка", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
 
     private void exportToExcel() {
