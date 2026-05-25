@@ -4,12 +4,14 @@ import main.java.com.psychotest.controller.TeacherController;
 import main.java.com.psychotest.model.Test;
 import main.java.com.psychotest.model.User;
 import main.java.com.psychotest.service.ResultService;
+import main.java.com.psychotest.view.dialogs.ChartDialog;
 import main.java.com.psychotest.view.dialogs.ResultDetailDialog;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 
 public class ResultsViewPanel extends JPanel {
     private TeacherController controller;
@@ -19,6 +21,7 @@ public class ResultsViewPanel extends JPanel {
     private JButton exportButton;
     private JButton viewDetailButton;
     private JButton deleteResultButton;
+    private JButton chartButton;
     private JLabel currentTestLabel;
     private int preSelectedTestId = -1;
     private String preSelectedTestName = "";
@@ -120,12 +123,17 @@ public class ResultsViewPanel extends JPanel {
         deleteResultButton.setEnabled(false);
         deleteResultButton.addActionListener(e -> deleteResult());
 
+        chartButton = new JButton("🥧 Диаграмма участников");
+        chartButton.setEnabled(false);
+        chartButton.addActionListener(e -> showChart());
+
         exportButton = new JButton("📊 Экспорт в Excel");
         exportButton.setEnabled(false); // включается после выбора теста
         exportButton.addActionListener(e -> exportToExcel());
 
         buttonPanel.add(viewDetailButton);
         buttonPanel.add(deleteResultButton);
+        buttonPanel.add(chartButton);
         buttonPanel.add(exportButton);
 
         add(buttonPanel, BorderLayout.SOUTH);
@@ -143,9 +151,14 @@ public class ResultsViewPanel extends JPanel {
         }
     }
 
-    /** Включает кнопку экспорта если выбран тест; строка при этом не обязательна */
+    /** Включает кнопки экспорта и диаграммы если выбран тест с результатами */
     private void updateExportButton() {
-        exportButton.setEnabled(testCombo.getSelectedItem() != null);
+        boolean testSelected = testCombo.getSelectedItem() != null;
+        exportButton.setEnabled(testSelected);
+        // Диаграмма доступна только если есть хотя бы одна настоящая строка
+        boolean hasResults = testSelected && tableModel.getRowCount() > 0
+                && tableModel.getValueAt(0, 0) instanceof Integer;
+        chartButton.setEnabled(hasResults);
     }
 
     private void loadResults() {
@@ -176,6 +189,9 @@ public class ResultsViewPanel extends JPanel {
         if (results.isEmpty()) {
             tableModel.addRow(new Object[]{"", "Нет результатов", "", "", ""});
         }
+
+        // Обновляем кнопки после наполнения таблицы (теперь известно, есть ли реальные строки)
+        updateExportButton();
     }
 
     private String getStatusText(String status) {
@@ -267,6 +283,49 @@ public class ResultsViewPanel extends JPanel {
                         "Ошибка", JOptionPane.ERROR_MESSAGE);
             }
         }
+    }
+
+    private void showChart() {
+        Test selectedTest = (Test) testCombo.getSelectedItem();
+        if (selectedTest == null) {
+            JOptionPane.showMessageDialog(this, "Выберите тест для построения диаграммы!");
+            return;
+        }
+
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+
+        SwingWorker<Map<String, Map<String, Integer>>, Void> worker =
+                new SwingWorker<Map<String, Map<String, Integer>>, Void>() {
+            @Override
+            protected Map<String, Map<String, Integer>> doInBackground() {
+                return controller.getTestStatistics(selectedTest.getId());
+            }
+
+            @Override
+            protected void done() {
+                setCursor(Cursor.getDefaultCursor());
+                try {
+                    Map<String, Map<String, Integer>> stats = get();
+                    if (stats == null || stats.isEmpty()) {
+                        JOptionPane.showMessageDialog(ResultsViewPanel.this,
+                                "Нет данных для построения диаграммы.\n" +
+                                "Убедитесь, что тест имеет параметры с интерпретациями.",
+                                "Нет данных", JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                    }
+                    ChartDialog dialog = new ChartDialog(
+                            SwingUtilities.getWindowAncestor(ResultsViewPanel.this),
+                            selectedTest.getName(), stats);
+                    dialog.setVisible(true);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(ResultsViewPanel.this,
+                            "Ошибка при построении диаграммы: " + ex.getMessage(),
+                            "Ошибка", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        };
+        worker.execute();
     }
 
     private void exportToExcel() {

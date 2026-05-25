@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 public class TeacherController {
     private TestDAO testDAO;
@@ -276,7 +277,20 @@ public class TeacherController {
     // ========== Экспорт в Excel ==========
 
     /**
-     * Экспортирует результаты теста в Excel
+     * Получить статистику интерпретаций по параметрам для всего теста.
+     * @return paramName → (метка → количество)
+     */
+    public Map<String, Map<String, Integer>> getTestStatistics(int testId) {
+        try {
+            return resultService.getTestStatistics(testId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new java.util.LinkedHashMap<>();
+        }
+    }
+
+    /**
+     * Экспортирует результаты теста в Excel (включая диаграммы)
      */
     public boolean exportTestResultsToExcel(int testId, String filePath) {
         Test test = getTestById(testId);
@@ -285,7 +299,8 @@ public class TeacherController {
         }
 
         List<ResultService.TestResult> results = getResultsForTest(testId);
-        return excelService.exportResultsToExcel(results, test, filePath);
+        Map<String, Map<String, Integer>> statistics = getTestStatistics(testId);
+        return excelService.exportResultsToExcel(results, test, statistics, filePath);
     }
 
     /**

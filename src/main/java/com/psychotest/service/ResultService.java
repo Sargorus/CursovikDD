@@ -238,6 +238,52 @@ public class ResultService {
     }
 
     /**
+     * Статистика интерпретаций по параметрам для всего теста.
+     * @return paramName → (метка интерпретации → количество участников)
+     */
+    public Map<String, Map<String, Integer>> getTestStatistics(int testId) throws SQLException {
+        Map<String, Map<String, Integer>> stats = new java.util.LinkedHashMap<>();
+
+        String sql =
+                "SELECT p.name AS param_name, " +
+                "       CASE " +
+                "           WHEN tr.interpreted_code IS NOT NULL AND tr.interpreted_code != '' " +
+                "               THEN tr.interpreted_code " +
+                "           WHEN tr.interpretation_text IS NOT NULL AND tr.interpretation_text != '' " +
+                "               THEN tr.interpretation_text " +
+                "           ELSE 'Нет данных' " +
+                "       END AS label, " +
+                "       COUNT(*) AS cnt " +
+                "FROM test_results tr " +
+                "JOIN parameters p   ON tr.parameter_id  = p.id " +
+                "JOIN test_sessions ts ON tr.session_id  = ts.id " +
+                "WHERE ts.test_id = ? AND ts.status = 'COMPLETED' " +
+                "GROUP BY p.name, " +
+                "         CASE " +
+                "             WHEN tr.interpreted_code IS NOT NULL AND tr.interpreted_code != '' " +
+                "                 THEN tr.interpreted_code " +
+                "             WHEN tr.interpretation_text IS NOT NULL AND tr.interpretation_text != '' " +
+                "                 THEN tr.interpretation_text " +
+                "             ELSE 'Нет данных' " +
+                "         END " +
+                "ORDER BY p.name, cnt DESC";
+
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, testId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                String paramName = rs.getString("param_name");
+                String label     = rs.getString("label");
+                int    cnt       = rs.getInt("cnt");
+                stats.computeIfAbsent(paramName, k -> new java.util.LinkedHashMap<>())
+                     .put(label, cnt);
+            }
+        }
+        return stats;
+    }
+
+    /**
      * Получить название теста по ID сессии
      */
     public String getTestNameBySessionId(int sessionId) throws SQLException {

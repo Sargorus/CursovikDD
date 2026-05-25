@@ -2,9 +2,13 @@ package main.java.com.psychotest.service;
 
 import main.java.com.psychotest.model.Test;
 import main.java.com.psychotest.model.User;
+import main.java.com.psychotest.util.PieChartRenderer;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Timestamp;
@@ -18,35 +22,39 @@ public class ExcelReportService {
             DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
     /**
-     * Экспортирует результаты теста в Excel файл
-     * @param results список результатов
-     * @param test тест
-     * @param filePath путь для сохранения файла
-     * @return true если успешно, false если ошибка
+     * Экспортирует результаты теста в Excel файл (с диаграммами распределения).
+     *
+     * @param results    список результатов
+     * @param test       тест
+     * @param statistics статистика интерпретаций: paramName → (метка → кол-во)
+     * @param filePath   путь для сохранения
+     * @return true если успешно
      */
     public boolean exportResultsToExcel(List<ResultService.TestResult> results,
                                         Test test,
+                                        Map<String, Map<String, Integer>> statistics,
                                         String filePath) {
         try (Workbook workbook = new HSSFWorkbook()) {
 
-            // Создаём стили
             Map<String, CellStyle> styles = createStyles(workbook);
 
-            // Создаём лист с общей статистикой
             Sheet summarySheet = workbook.createSheet("Общая статистика");
             createSummarySheet(summarySheet, results, test, styles);
 
-            // Создаём лист с детальными результатами
             Sheet detailsSheet = workbook.createSheet("Детальные результаты");
             createDetailsSheet(detailsSheet, results, test, styles);
 
-            // Автоматически подгоняем ширину колонок
-            for (int i = 0; i <= 6; i++) {
-                detailsSheet.autoSizeColumn(i);
-                summarySheet.autoSizeColumn(i);
+            // Лист с диаграммами (если есть данные)
+            if (statistics != null && !statistics.isEmpty()) {
+                Sheet chartsSheet = workbook.createSheet("Диаграммы");
+                createChartsSheet(chartsSheet, statistics, workbook, styles);
             }
 
-            // Сохраняем файл
+            for (int i = 0; i <= 6; i++) {
+                try { detailsSheet.autoSizeColumn(i); } catch (Exception ignored) {}
+                try { summarySheet.autoSizeColumn(i); } catch (Exception ignored) {}
+            }
+
             try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
                 workbook.write(fileOut);
             }
@@ -140,6 +148,52 @@ public class ExcelReportService {
         styles.put("error", errorStyle);
 
         return styles;
+    }
+
+    private void createChartsSheet(Sheet sheet,
+                                   Map<String, Map<String, Integer>> statistics,
+                                   Workbook workbook,
+                                   Map<String, CellStyle> styles) {
+        int rowNum = 0;
+
+        Row titleRow = sheet.createRow(rowNum++);
+        Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue("Диаграммы распределения результатов");
+        titleCell.setCellStyle(styles.get("header"));
+        rowNum++;
+
+        Drawing<?> drawing  = sheet.createDrawingPatriarch();
+        CreationHelper helper = workbook.getCreationHelper();
+
+        for (Map.Entry<String, Map<String, Integer>> entry : statistics.entrySet()) {
+            // Подпись параметра
+            Row labelRow = sheet.createRow(rowNum);
+            Cell labelCell = labelRow.createCell(0);
+            labelCell.setCellValue(entry.getKey());
+            labelCell.setCellStyle(styles.get("header"));
+            rowNum++;
+
+            // Рендерим диаграмму в PNG
+            try {
+                BufferedImage img = PieChartRenderer.render(
+                        entry.getKey(), entry.getValue(), 600, 400);
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ImageIO.write(img, "PNG", baos);
+                int picIdx = workbook.addPicture(
+                        baos.toByteArray(), Workbook.PICTURE_TYPE_PNG);
+
+                ClientAnchor anchor = helper.createClientAnchor();
+                anchor.setCol1(0);
+                anchor.setRow1(rowNum);
+                anchor.setCol2(8);
+                anchor.setRow2(rowNum + 22);
+                drawing.createPicture(anchor, picIdx);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            rowNum += 24; // высота изображения + отступ
+        }
     }
 
     private void createSummarySheet(Sheet sheet, List<ResultService.TestResult> results,
