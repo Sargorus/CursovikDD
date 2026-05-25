@@ -8,10 +8,12 @@ import main.java.com.psychotest.model.*;
 import main.java.com.psychotest.service.TestPersistenceService;
 import main.java.com.psychotest.service.ResultService;
 import main.java.com.psychotest.service.ExcelReportService;
+import main.java.com.psychotest.service.ResultCalculationService;
 import main.java.com.psychotest.util.DatabaseConnection;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -290,7 +292,22 @@ public class TeacherController {
     }
 
     /**
-     * Экспортирует результаты теста в Excel (включая диаграммы)
+     * Для каждого параметра возвращает список участников, сгруппированных по
+     * метке интерпретации (области диаграммы).
+     *
+     * @return paramName → (label → [ФИО участников])
+     */
+    public Map<String, Map<String, List<String>>> getParticipantsByLabel(int testId) {
+        try {
+            return resultService.getParticipantsByLabel(testId);
+        } catch (java.sql.SQLException e) {
+            e.printStackTrace();
+            return new java.util.LinkedHashMap<>();
+        }
+    }
+
+    /**
+     * Экспортирует результаты теста в Excel (включая диаграммы и список участников)
      */
     public boolean exportTestResultsToExcel(int testId, String filePath) {
         Test test = getTestById(testId);
@@ -298,9 +315,10 @@ public class TeacherController {
             return false;
         }
 
-        List<ResultService.TestResult> results = getResultsForTest(testId);
-        Map<String, Map<String, Integer>> statistics = getTestStatistics(testId);
-        return excelService.exportResultsToExcel(results, test, statistics, filePath);
+        List<ResultService.TestResult> results     = getResultsForTest(testId);
+        Map<String, Map<String, Integer>> statistics    = getTestStatistics(testId);
+        Map<String, Map<String, List<String>>> participants = getParticipantsByLabel(testId);
+        return excelService.exportResultsToExcel(results, test, statistics, participants, filePath);
     }
 
     /**
@@ -409,6 +427,50 @@ public class TeacherController {
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
+        }
+    }
+
+    // ========== Пробный запуск теста (без сохранения в БД) ==========
+
+    /**
+     * Загружает полный тест для пробного запуска преподавателем.
+     * Применяет лимит вопросов (если задан) — тот же алгоритм случайной выборки,
+     * что и при обычном прохождении.
+     */
+    public Test getFullTestForPreview(int testId) {
+        try {
+            Test test = testDAO.findById(testId);
+            if (test != null) {
+                List<Question> questions = testDAO.loadQuestionsForTest(testId);
+                int limit = test.getQuestionsPerSession();
+                if (limit > 0 && questions.size() > limit) {
+                    Collections.shuffle(questions);
+                    questions = questions.subList(0, limit);
+                }
+                test.setQuestionBank(questions);
+            }
+            return test;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Рассчитывает результаты пробного прохождения теста — без сохранения в БД.
+     *
+     * @param testId      ID теста
+     * @param testName    название теста
+     * @param userAnswers questionId → answerOptionId (собранные в UI)
+     * @return рассчитанный результат или null при ошибке
+     */
+    public TestResult calculatePreviewResult(int testId, String testName,
+                                             Map<Integer, Integer> userAnswers) {
+        try {
+            return new ResultCalculationService().calculateResultsLocally(testId, testName, userAnswers);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
         }
     }
 

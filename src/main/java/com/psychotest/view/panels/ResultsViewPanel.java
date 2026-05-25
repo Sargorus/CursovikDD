@@ -294,18 +294,29 @@ public class ResultsViewPanel extends JPanel {
 
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
-        SwingWorker<Map<String, Map<String, Integer>>, Void> worker =
-                new SwingWorker<Map<String, Map<String, Integer>>, Void>() {
+        // Загружаем статистику И список участников по областям в фоне
+        SwingWorker<Object[], Void> worker = new SwingWorker<Object[], Void>() {
             @Override
-            protected Map<String, Map<String, Integer>> doInBackground() {
-                return controller.getTestStatistics(selectedTest.getId());
+            protected Object[] doInBackground() {
+                Map<String, Map<String, Integer>> stats =
+                        controller.getTestStatistics(selectedTest.getId());
+                Map<String, Map<String, List<String>>> participants =
+                        controller.getParticipantsByLabel(selectedTest.getId());
+                return new Object[]{stats, participants};
             }
 
             @Override
             protected void done() {
                 setCursor(Cursor.getDefaultCursor());
                 try {
-                    Map<String, Map<String, Integer>> stats = get();
+                    Object[] result = get();
+                    @SuppressWarnings("unchecked")
+                    Map<String, Map<String, Integer>> stats =
+                            (Map<String, Map<String, Integer>>) result[0];
+                    @SuppressWarnings("unchecked")
+                    Map<String, Map<String, List<String>>> participants =
+                            (Map<String, Map<String, List<String>>>) result[1];
+
                     if (stats == null || stats.isEmpty()) {
                         JOptionPane.showMessageDialog(ResultsViewPanel.this,
                                 "Нет данных для построения диаграммы.\n" +
@@ -315,7 +326,7 @@ public class ResultsViewPanel extends JPanel {
                     }
                     ChartDialog dialog = new ChartDialog(
                             SwingUtilities.getWindowAncestor(ResultsViewPanel.this),
-                            selectedTest.getName(), stats);
+                            selectedTest.getName(), stats, participants);
                     dialog.setVisible(true);
                 } catch (Exception ex) {
                     ex.printStackTrace();

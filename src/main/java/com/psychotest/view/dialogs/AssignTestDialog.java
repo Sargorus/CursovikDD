@@ -2,8 +2,8 @@ package main.java.com.psychotest.view.dialogs;
 
 import main.java.com.psychotest.controller.TeacherController;
 import main.java.com.psychotest.model.Group;
-import main.java.com.psychotest.model.Test;
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.Date;
 import java.util.List;
@@ -13,7 +13,9 @@ public class AssignTestDialog extends JDialog {
     private int testId;
     private String testName;
 
-    private JComboBox<Group> groupCombo;
+    private JTable groupTable;
+    private DefaultTableModel groupTableModel;
+    private List<Group> groups;
     private JSpinner dateSpinner;
     private JCheckBox noDueDateCheckBox;
     private boolean confirmed = false;
@@ -24,9 +26,8 @@ public class AssignTestDialog extends JDialog {
         this.testId = testId;
         this.testName = testName;
         initComponents();
-        pack();
         setLocationRelativeTo(parent);
-        setSize(450, 250);
+        setSize(550, 420);
     }
 
     private void initComponents() {
@@ -38,52 +39,75 @@ public class AssignTestDialog extends JDialog {
         infoPanel.setBorder(BorderFactory.createTitledBorder("Информация"));
         add(infoPanel, BorderLayout.NORTH);
 
-        // Основная панель выбора группы
-        JPanel mainPanel = new JPanel(new GridBagLayout());
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 10, 10, 10);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        // Центральная панель
+        JPanel centerPanel = new JPanel(new BorderLayout(10, 10));
+        centerPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Выбор группы
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        mainPanel.add(new JLabel("Выберите группу:"), gbc);
+        // Метка над таблицей
+        JLabel groupLabel = new JLabel("Выберите группу для назначения теста:");
+        groupLabel.setFont(groupLabel.getFont().deriveFont(Font.BOLD));
+        centerPanel.add(groupLabel, BorderLayout.NORTH);
 
-        gbc.gridx = 1;
-        List<Group> groups = controller.getAllGroups();
-        groupCombo = new JComboBox<>(groups.toArray(new Group[0]));
-        groupCombo.setPreferredSize(new Dimension(200, 25));
+        // Таблица групп
+        groups = controller.getAllGroups();
+        String[] columns = {"Название группы", "Описание"};
+        groupTableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
+
+        for (Group g : groups) {
+            String desc = g.getDescription() != null ? g.getDescription() : "";
+            groupTableModel.addRow(new Object[]{g.getName(), desc});
+        }
 
         if (groups.isEmpty()) {
-            groupCombo.addItem(new Group("Нет доступных групп", ""));
-            groupCombo.setEnabled(false);
+            groupTableModel.addRow(new Object[]{"Нет доступных групп", ""});
         }
-        mainPanel.add(groupCombo, gbc);
 
-        // Дата выполнения
-        gbc.gridx = 0;
-        gbc.gridy = 1;
-        mainPanel.add(new JLabel("Дата выполнения:"), gbc);
+        groupTable = new JTable(groupTableModel);
+        groupTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        groupTable.setRowHeight(26);
+        groupTable.getColumnModel().getColumn(0).setPreferredWidth(180);
+        groupTable.getColumnModel().getColumn(1).setPreferredWidth(280);
+
+        if (groups.isEmpty()) {
+            groupTable.setEnabled(false);
+        } else {
+            groupTable.setRowSelectionInterval(0, 0); // выбираем первую группу по умолчанию
+        }
+
+        JScrollPane groupScroll = new JScrollPane(groupTable);
+        groupScroll.setBorder(BorderFactory.createLineBorder(Color.GRAY));
+        centerPanel.add(groupScroll, BorderLayout.CENTER);
+
+        // Панель с датой
+        JPanel datePanel = new JPanel(new GridBagLayout());
+        datePanel.setBorder(BorderFactory.createTitledBorder("Срок выполнения"));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 10, 5, 10);
+        gbc.anchor = GridBagConstraints.WEST;
+
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2;
+        noDueDateCheckBox = new JCheckBox("Без срока выполнения (тест доступен без ограничений)");
+        noDueDateCheckBox.setSelected(true);
+        datePanel.add(noDueDateCheckBox, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1;
+        datePanel.add(new JLabel("Дата выполнения:"), gbc);
 
         gbc.gridx = 1;
         dateSpinner = new JSpinner(new SpinnerDateModel());
         JSpinner.DateEditor dateEditor = new JSpinner.DateEditor(dateSpinner, "dd.MM.yyyy");
         dateSpinner.setEditor(dateEditor);
-        mainPanel.add(dateSpinner, gbc);
+        dateSpinner.setEnabled(false); // по умолчанию отключён
+        datePanel.add(dateSpinner, gbc);
 
-        // Чекбокс "Без срока"
-        gbc.gridx = 0;
-        gbc.gridy = 2;
-        gbc.gridwidth = 2;
-        noDueDateCheckBox = new JCheckBox("Без срока выполнения (тест доступен без ограничений)");
-        noDueDateCheckBox.setSelected(true); // по умолчанию — без срока
-        noDueDateCheckBox.addActionListener(e -> dateSpinner.setEnabled(!noDueDateCheckBox.isSelected()));
-        dateSpinner.setEnabled(false); // изначально спиннер отключён
-        mainPanel.add(noDueDateCheckBox, gbc);
-        gbc.gridwidth = 1;
+        noDueDateCheckBox.addActionListener(e ->
+                dateSpinner.setEnabled(!noDueDateCheckBox.isSelected()));
 
-        add(mainPanel, BorderLayout.CENTER);
+        centerPanel.add(datePanel, BorderLayout.SOUTH);
+        add(centerPanel, BorderLayout.CENTER);
 
         // Панель с кнопками
         JPanel buttonPanel = new JPanel(new FlowLayout());
@@ -91,22 +115,23 @@ public class AssignTestDialog extends JDialog {
         assignButton.addActionListener(e -> assign());
         JButton cancelButton = new JButton("❌ Отмена");
         cancelButton.addActionListener(e -> cancel());
-
         buttonPanel.add(assignButton);
         buttonPanel.add(cancelButton);
         add(buttonPanel, BorderLayout.SOUTH);
     }
 
     private void assign() {
-        Group selectedGroup = (Group) groupCombo.getSelectedItem();
-        if (selectedGroup == null || selectedGroup.getId() == 0) {
+        int selectedRow = groupTable.getSelectedRow();
+        if (selectedRow < 0 || groups.isEmpty()) {
             JOptionPane.showMessageDialog(this,
                     "Выберите группу для назначения!",
                     "Ошибка", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        // null если выбрано "Без срока", иначе — выбранная дата
+        Group selectedGroup = groups.get(selectedRow);
+
+        // null если «Без срока», иначе выбранная дата
         Date dueDate = noDueDateCheckBox.isSelected() ? null : (Date) dateSpinner.getValue();
 
         boolean success = controller.assignTestToGroup(testId, selectedGroup.getId(), dueDate);

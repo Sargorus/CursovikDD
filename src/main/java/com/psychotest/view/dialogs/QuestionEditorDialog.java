@@ -198,7 +198,7 @@ public class QuestionEditorDialog extends JDialog {
                 Integer v = existing.getParameterImpacts().get(i);
                 if (v != null) prefill = v;
             }
-            JSpinner sp = new JSpinner(new SpinnerNumberModel(prefill, -10, 10, 1));
+            JSpinner sp = new JSpinner(new SpinnerNumberModel(Math.max(0, prefill), 0, 9999, 1));
             sp.setPreferredSize(new Dimension(65, 26));
             g.gridx = 2 + i; g.weightx = 0;
             row.add(sp, g);
