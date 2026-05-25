@@ -105,6 +105,90 @@ public class ResultCalculationService {
     }
 
     /**
+     * Рассчитывает результаты теста локально — без сохранения в БД.
+     * Используется для пробного запуска теста преподавателем.
+     *
+     * @param testId      ID теста в БД
+     * @param testName    название теста
+     * @param userAnswers questionId → answerOptionId (ответы из UI)
+     */
+    public TestResult calculateResultsLocally(int testId, String testName,
+                                              Map<Integer, Integer> userAnswers) throws SQLException {
+        TestResult result = new TestResult();
+        result.setTestId(testId);
+        result.setTestName(testName);
+
+        if (userAnswers == null || userAnswers.isEmpty()) {
+            result.setErrorMessage("Нет ответов");
+            return result;
+        }
+
+        List<Parameter> parameters = loadParameters(testId);
+        List<Question> questions = loadQuestionsWithAnswers(testId);
+
+        // questionId → выбранный AnswerOption
+        Map<Integer, AnswerOption> selectedAnswers = new HashMap<>();
+        for (Question q : questions) {
+            Integer selectedOptionId = userAnswers.get(q.getId());
+            if (selectedOptionId != null) {
+                for (AnswerOption opt : q.getAnswerOptions()) {
+                    if (opt.getId() == selectedOptionId) {
+                        selectedAnswers.put(q.getId(), opt);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Сырые баллы
+        Map<String, Integer> rawScores = new HashMap<>();
+        for (Parameter param : parameters) rawScores.put(param.getName(), 0);
+
+        for (Question q : questions) {
+            AnswerOption selected = selectedAnswers.get(q.getId());
+            if (selected != null) {
+                Map<Integer, Integer> impacts = selected.getParameterImpacts();
+                for (Parameter param : parameters) {
+                    Integer delta = impacts.get(param.getId());
+                    if (delta != null) {
+                        rawScores.put(param.getName(), rawScores.get(param.getName()) + delta);
+                    }
+                }
+            }
+        }
+
+        // Интерпретация
+        Map<String, Integer> scaledScores = new HashMap<>();
+        Map<String, String> interpretations = new HashMap<>();
+
+        for (Parameter param : parameters) {
+            int raw = rawScores.get(param.getName());
+            scaledScores.put(param.getName(), raw);
+
+            String interp;
+            if ("BINARY".equals(param.getScaleType())) {
+                List<ParameterInterpretation> interps = param.getInterpretations();
+                if (!interps.isEmpty()) {
+                    ParameterInterpretation chosen = (raw > 0 && interps.size() > 1)
+                            ? interps.get(1) : interps.get(0);
+                    interp = chosen.getInterpretationText();
+                } else {
+                    interp = "Нет интерпретации";
+                }
+            } else {
+                interp = findRangeInterpretation(param, raw);
+            }
+            interpretations.put(param.getName(), interp);
+        }
+
+        result.setRawScores(rawScores);
+        result.setScaledScores(scaledScores);
+        result.setInterpretations(interpretations);
+        result.setCompleted(true);
+        return result;
+    }
+
+    /**
      * Получить ответы пользователя из сессии
      */
     private Map<Integer, Integer> getUserAnswers(int sessionId) throws SQLException {

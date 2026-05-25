@@ -6,6 +6,7 @@ import main.java.com.psychotest.model.Test;
 import main.java.com.psychotest.model.TestState;
 import main.java.com.psychotest.view.dialogs.AssignTestDialog;
 import main.java.com.psychotest.view.dialogs.TestConstructorDialog;
+import main.java.com.psychotest.view.dialogs.TestPreviewDialog;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -23,6 +24,7 @@ public class AllTestsPanel extends JPanel {
     private JButton deleteButton;
     private JButton assignButton;
     private JButton resultsButton;
+    private JButton previewButton;
     private OnTestSelectedListener listener;
     private boolean isAdmin = false;
 
@@ -113,6 +115,7 @@ public class AllTestsPanel extends JPanel {
             if (deleteButton != null) deleteButton.setEnabled(rowIsReal);
             if (assignButton != null) assignButton.setEnabled(rowIsReal);
             if (resultsButton != null) resultsButton.setEnabled(rowIsReal);
+            if (previewButton != null) previewButton.setEnabled(rowIsReal);
         });
 
         testsTable.getColumnModel().getColumn(0).setMaxWidth(50);
@@ -137,6 +140,11 @@ public class AllTestsPanel extends JPanel {
         assignButton.setEnabled(false);
         assignButton.addActionListener(e -> assignTest());
 
+        previewButton = new JButton("🧪 Пробный запуск");
+        previewButton.setEnabled(false);
+        previewButton.setToolTipText("Пройти тест без сохранения результатов в базу данных");
+        previewButton.addActionListener(e -> previewTest());
+
         resultsButton = new JButton("📊 Результаты");
         resultsButton.setEnabled(false);
         resultsButton.addActionListener(e -> showResults());
@@ -148,6 +156,7 @@ public class AllTestsPanel extends JPanel {
         buttonPanel.add(createButton);
         buttonPanel.add(editButton);
         buttonPanel.add(assignButton);
+        if (!isAdmin) buttonPanel.add(previewButton); // пробный запуск только для преподавателя
         buttonPanel.add(resultsButton);
         buttonPanel.add(deleteButton);
 
@@ -342,6 +351,35 @@ public class AllTestsPanel extends JPanel {
         }
 
         AssignTestDialog dialog = new AssignTestDialog(
+                SwingUtilities.getWindowAncestor(this),
+                controller,
+                testId,
+                testName
+        );
+        dialog.setVisible(true);
+    }
+
+    // Пробный запуск теста (только для преподавателя, без сохранения в БД)
+    private void previewTest() {
+        int selectedRow = testsTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Выберите тест для пробного запуска!");
+            return;
+        }
+
+        Object idVal = tableModel.getValueAt(selectedRow, 0);
+        if (!(idVal instanceof Integer)) return;
+        int testId = (int) idVal;
+        String testName = (String) tableModel.getValueAt(selectedRow, 1);
+
+        if (isAdmin) {
+            JOptionPane.showMessageDialog(this,
+                    "Администратор не может проходить тесты.\nВойдите как преподаватель.",
+                    "Доступ запрещён", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        TestPreviewDialog dialog = new TestPreviewDialog(
                 SwingUtilities.getWindowAncestor(this),
                 controller,
                 testId,

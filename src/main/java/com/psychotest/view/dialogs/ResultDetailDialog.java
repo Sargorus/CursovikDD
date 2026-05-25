@@ -114,39 +114,31 @@ public class ResultDetailDialog extends JDialog {
             return panel;
         }
 
-        // Создаём таблицу для параметров
-        String[] columns = {"Параметр", "Тип шкалы", "Сырой балл", "Итоговый балл", "Код", "Интерпретация"};
-        Object[][] data = new Object[detail.getParameterResults().size()][6];
+        // Только параметр, тип шкалы, область (код) и интерпретация — без сырых баллов
+        String[] columns = {"Параметр", "Тип шкалы", "Область", "Интерпретация"};
+        Object[][] data = new Object[detail.getParameterResults().size()][4];
 
         int i = 0;
         for (var entry : detail.getParameterResults().entrySet()) {
             ResultService.ParameterResult pr = entry.getValue();
             data[i][0] = pr.getParamName();
             data[i][1] = pr.getScaleType().equals("BINARY") ? "Бинарная" : "Диапазонная";
-            data[i][2] = pr.getRawScore();
-            data[i][3] = pr.getScaledScore();
-            data[i][4] = pr.getInterpretedCode() != null ? pr.getInterpretedCode() : "";
-            data[i][5] = truncate(pr.getInterpretationText(), 80);
+            data[i][2] = pr.getInterpretedCode() != null ? pr.getInterpretedCode() : "—";
+            data[i][3] = truncate(pr.getInterpretationText(), 100);
             i++;
         }
 
-        JTable table = new JTable(data, columns);
-        table.setRowHeight(25);
-        table.getColumnModel().getColumn(0).setPreferredWidth(100);
-        table.getColumnModel().getColumn(1).setPreferredWidth(80);
+        JTable table = new JTable(data, columns) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+        table.setRowHeight(26);
+        table.getColumnModel().getColumn(0).setPreferredWidth(130);
+        table.getColumnModel().getColumn(1).setPreferredWidth(90);
         table.getColumnModel().getColumn(2).setPreferredWidth(70);
-        table.getColumnModel().getColumn(3).setPreferredWidth(80);
-        table.getColumnModel().getColumn(4).setPreferredWidth(60);
-        table.getColumnModel().getColumn(5).setPreferredWidth(300);
+        table.getColumnModel().getColumn(3).setPreferredWidth(350);
 
         JScrollPane scrollPane = new JScrollPane(table);
         panel.add(scrollPane, BorderLayout.CENTER);
-
-        // Добавляем информационную панель
-        JPanel infoPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        infoPanel.add(new JLabel("Сырой балл - сумма влияний ответов. Итоговый балл - масштабированный результат."));
-        infoPanel.setBorder(BorderFactory.createEtchedBorder());
-        panel.add(infoPanel, BorderLayout.NORTH);
 
         return panel;
     }
@@ -199,42 +191,7 @@ public class ResultDetailDialog extends JDialog {
         answerLabel.setForeground(new Color(0, 100, 0));
 
         panel.add(questionLabel, BorderLayout.NORTH);
-
-        // Если есть влияния на параметры — строим панель с баллами под ответом
-        if (!answer.getParameterImpacts().isEmpty()) {
-            JPanel answerWithScores = new JPanel();
-            answerWithScores.setLayout(new BoxLayout(answerWithScores, BoxLayout.Y_AXIS));
-            answerWithScores.setOpaque(false);
-
-            answerLabel.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
-            answerWithScores.add(answerLabel);
-            answerWithScores.add(Box.createVerticalStrut(4));
-
-            // Строка с баллами: «Баллы: Экстраверсия +1 · Нейротизм −1»
-            StringBuilder sb = new StringBuilder("<html><font color='#555555'><i>Баллы:&nbsp;</i></font>");
-            boolean first = true;
-            for (var entry : answer.getParameterImpacts().entrySet()) {
-                if (!first) sb.append("<font color='#888888'>&nbsp;·&nbsp;</font>");
-                int delta = entry.getValue();
-                String color = delta > 0 ? "#1a6b1a" : (delta < 0 ? "#8b0000" : "#555555");
-                String sign  = delta > 0 ? "+" : "";
-                sb.append("<font color='").append(color).append("'><b>")
-                  .append(escapeHtml(entry.getKey()))
-                  .append("&nbsp;").append(sign).append(delta)
-                  .append("</b></font>");
-                first = false;
-            }
-            sb.append("</html>");
-
-            JLabel scoresLabel = new JLabel(sb.toString());
-            scoresLabel.setFont(new Font("Arial", Font.PLAIN, 11));
-            scoresLabel.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
-            answerWithScores.add(scoresLabel);
-
-            panel.add(answerWithScores, BorderLayout.CENTER);
-        } else {
-            panel.add(answerLabel, BorderLayout.CENTER);
-        }
+        panel.add(answerLabel, BorderLayout.CENTER);
 
         return panel;
     }
@@ -268,10 +225,8 @@ public class ResultDetailDialog extends JDialog {
             ResultService.ParameterResult pr = entry.getValue();
             sb.append("📊 ").append(pr.getParamName()).append("\n");
             sb.append("   ").append("─".repeat(pr.getParamName().length() + 2)).append("\n");
-            sb.append("   Сырой балл: ").append(pr.getRawScore()).append("\n");
-            sb.append("   Итоговый балл: ").append(pr.getScaledScore()).append("\n");
             if (pr.getInterpretedCode() != null && !pr.getInterpretedCode().isEmpty()) {
-                sb.append("   Код: ").append(pr.getInterpretedCode()).append("\n");
+                sb.append("   Область: ").append(pr.getInterpretedCode()).append("\n");
             }
             String interpText = pr.getInterpretationText();
             if (interpText != null && !interpText.isEmpty()) {

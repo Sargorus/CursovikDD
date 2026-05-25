@@ -244,31 +244,95 @@ public class TestConstructorDialog extends JDialog {
             return;
         }
 
-        String confirmMsg = controller.isEditMode()
-                ? "Сохранить изменения теста \"" + controller.getTestName() + "\"?\n\nВнимание: предыдущие параметры и вопросы будут заменены."
-                : "Сохранить тест \"" + controller.getTestName() + "\"?";
+        // ── Режим создания нового теста: простой вопрос ───────────────────────
+        if (!controller.isEditMode()) {
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "Сохранить тест «" + controller.getTestName() + "»?",
+                    "Подтверждение сохранения",
+                    JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                doSave(false);
+            }
+            return;
+        }
 
-        int confirm = JOptionPane.showConfirmDialog(this,
-                confirmMsg,
-                "Подтверждение сохранения",
-                JOptionPane.YES_NO_OPTION);
+        // ── Режим редактирования: три варианта ───────────────────────────────
+        int existingResults = controller.countExistingResults();
 
-        if (confirm == JOptionPane.YES_OPTION) {
-            try {
-                int testId = controller.saveTestToDatabase();
-                String successMsg = controller.isEditMode()
+        String details = (existingResults > 0)
+                ? "У теста есть " + existingResults + " завершённых результатов.\n\n"
+                  + "• «Заменить» удалит все результаты (структура изменилась).\n"
+                  + "• «Новый тест» создаст копию — старые результаты сохранятся.\n\n"
+                : "Выберите, что сделать с изменениями:\n\n";
+
+        String[] options = {
+                "✏  Заменить существующий",
+                "📋  Сохранить как новый тест",
+                "Отмена"
+        };
+
+        int choice = JOptionPane.showOptionDialog(this,
+                "Тест: «" + controller.getTestName() + "»\n\n" + details,
+                "Сохранение изменений",
+                JOptionPane.YES_NO_CANCEL_OPTION,
+                existingResults > 0 ? JOptionPane.WARNING_MESSAGE : JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[1]);   // кнопка по умолчанию — «Сохранить как новый»
+
+        if (choice == 0) {
+            // Заменить существующий — дополнительное подтверждение при наличии результатов
+            if (existingResults > 0) {
+                int warn = JOptionPane.showConfirmDialog(this,
+                        "⚠  Все " + existingResults + " результатов будут БЕЗВОЗВРАТНО УДАЛЕНЫ.\n\n"
+                        + "Старые ответы участников несовместимы с новой структурой теста.\n"
+                        + "Продолжить замену?",
+                        "Подтверждение удаления результатов",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE);
+                if (warn != JOptionPane.YES_OPTION) return;
+            }
+            doSave(false);
+
+        } else if (choice == 1) {
+            // Сохранить как новый тест
+            doSave(true);
+        }
+        // choice == 2 (Отмена) или окно закрыто — ничего не делаем
+    }
+
+    /**
+     * Выполняет сохранение и показывает сообщение об успехе.
+     *
+     * @param asNew {@code true} — создать новый тест (старый остаётся нетронутым);
+     *              {@code false} — заменить существующий (или создать при первом сохранении)
+     */
+    private void doSave(boolean asNew) {
+        try {
+            int testId;
+            String successMsg;
+
+            if (asNew) {
+                testId = controller.saveAsNewTest();
+                successMsg = "Тест успешно сохранён как новый!\n"
+                           + "ID нового теста: " + testId + "\n\n"
+                           + "Старый тест и все его результаты остались в базе данных.";
+            } else {
+                testId = controller.saveTestToDatabase();
+                successMsg = controller.isEditMode()
                         ? "Тест успешно обновлён!\nID теста: " + testId
                         : "Тест успешно сохранён!\nID теста: " + testId;
-                JOptionPane.showMessageDialog(this,
-                        successMsg,
-                        "Успех", JOptionPane.INFORMATION_MESSAGE);
-                dispose();
-            } catch (SQLException e) {
-                JOptionPane.showMessageDialog(this,
-                        "Ошибка при сохранении теста:\n" + e.getMessage(),
-                        "Ошибка БД", JOptionPane.ERROR_MESSAGE);
-                e.printStackTrace();
             }
+
+            JOptionPane.showMessageDialog(this,
+                    successMsg, "Успех", JOptionPane.INFORMATION_MESSAGE);
+            dispose();
+
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Ошибка при сохранении теста:\n" + e.getMessage(),
+                    "Ошибка БД", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
         }
     }
 

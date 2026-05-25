@@ -361,7 +361,27 @@ public class TestDAO {
                 pstmt.executeUpdate();
             }
 
-            // 2. Удаляем старые влияния → ответы → вопросы (через явный порядок)
+            // 2. Сначала удаляем данные участников — они ссылаются на answer_options и parameters через FK.
+            //    Без этого шага PostgreSQL выбросит ConstraintViolation при удалении answer_options/parameters.
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM user_answers WHERE session_id IN " +
+                    "(SELECT id FROM test_sessions WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM test_results WHERE session_id IN " +
+                    "(SELECT id FROM test_sessions WHERE test_id = ?)")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(
+                    "DELETE FROM test_sessions WHERE test_id = ?")) {
+                pstmt.setInt(1, testId);
+                pstmt.executeUpdate();
+            }
+
+            // 3. Удаляем старые влияния → ответы → вопросы (через явный порядок)
             try (PreparedStatement pstmt = conn.prepareStatement(
                     "DELETE FROM answer_parameter_impact WHERE answer_option_id IN " +
                     "(SELECT ao.id FROM answer_options ao JOIN questions q ON ao.question_id = q.id WHERE q.test_id = ?)")) {
@@ -378,7 +398,7 @@ public class TestDAO {
                 pstmt.executeUpdate();
             }
 
-            // 3. Удаляем старые интерпретации → параметры
+            // 4. Удаляем старые интерпретации → параметры
             try (PreparedStatement pstmt = conn.prepareStatement(
                     "DELETE FROM parameter_interpretations WHERE parameter_id IN " +
                     "(SELECT id FROM parameters WHERE test_id = ?)")) {
@@ -390,14 +410,14 @@ public class TestDAO {
                 pstmt.executeUpdate();
             }
 
-            // 4. Сохраняем новые параметры (получаем реальные ID)
+            // 5. Сохраняем новые параметры (получаем реальные ID)
             List<Parameter> savedParams = state.getParameters();
             for (Parameter param : savedParams) {
                 int paramId = saveParameter(conn, testId, param);
                 param.setId(paramId);
             }
 
-            // 5. Сохраняем новые вопросы, ответы и влияния
+            // 6. Сохраняем новые вопросы, ответы и влияния
             for (Question question : state.getQuestions()) {
                 int questionId = saveQuestion(conn, testId, question);
                 for (AnswerOption option : question.getAnswerOptions()) {
@@ -735,6 +755,22 @@ public class TestDAO {
             }
         }
         return testIds;
+    }
+
+    /**
+     * Считает количество завершённых сессий для теста.
+     * Используется перед редактированием теста, чтобы предупредить преподавателя
+     * о потере результатов.
+     */
+    public int countCompletedSessions(int testId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM test_sessions WHERE test_id = ? AND status = 'COMPLETED'";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, testId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        }
+        return 0;
     }
 
     /**

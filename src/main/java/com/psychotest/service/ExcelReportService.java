@@ -1,10 +1,15 @@
 package main.java.com.psychotest.service;
 
 import main.java.com.psychotest.model.Test;
+import main.java.com.psychotest.model.TestResult;
 import main.java.com.psychotest.model.User;
+import main.java.com.psychotest.util.PieChartRenderer;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Timestamp;
@@ -18,35 +23,41 @@ public class ExcelReportService {
             DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
     /**
-     * Экспортирует результаты теста в Excel файл
-     * @param results список результатов
-     * @param test тест
-     * @param filePath путь для сохранения файла
-     * @return true если успешно, false если ошибка
+     * Экспортирует результаты теста в Excel файл (с диаграммами и списком участников).
+     *
+     * @param results      список результатов
+     * @param test         тест
+     * @param statistics   статистика интерпретаций: paramName → (метка → кол-во)
+     * @param participants список участников по областям: paramName → (метка → [ФИО, ...])
+     * @param filePath     путь для сохранения
+     * @return true если успешно
      */
     public boolean exportResultsToExcel(List<ResultService.TestResult> results,
                                         Test test,
+                                        Map<String, Map<String, Integer>> statistics,
+                                        Map<String, Map<String, List<String>>> participants,
                                         String filePath) {
         try (Workbook workbook = new HSSFWorkbook()) {
 
-            // Создаём стили
             Map<String, CellStyle> styles = createStyles(workbook);
 
-            // Создаём лист с общей статистикой
             Sheet summarySheet = workbook.createSheet("Общая статистика");
             createSummarySheet(summarySheet, results, test, styles);
 
-            // Создаём лист с детальными результатами
             Sheet detailsSheet = workbook.createSheet("Детальные результаты");
             createDetailsSheet(detailsSheet, results, test, styles);
 
-            // Автоматически подгоняем ширину колонок
-            for (int i = 0; i <= 6; i++) {
-                detailsSheet.autoSizeColumn(i);
-                summarySheet.autoSizeColumn(i);
+            // Лист с диаграммами (если есть данные)
+            if (statistics != null && !statistics.isEmpty()) {
+                Sheet chartsSheet = workbook.createSheet("Диаграммы");
+                createChartsSheet(chartsSheet, statistics, participants, workbook, styles);
             }
 
-            // Сохраняем файл
+            for (int i = 0; i <= 6; i++) {
+                try { detailsSheet.autoSizeColumn(i); } catch (Exception ignored) {}
+                try { summarySheet.autoSizeColumn(i); } catch (Exception ignored) {}
+            }
+
             try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
                 workbook.write(fileOut);
             }
@@ -85,6 +96,71 @@ public class ExcelReportService {
                 workbook.write(fileOut);
             }
 
+            return true;
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Экспортирует результаты пробного запуска теста преподавателем в Excel.
+     * Результаты не хранятся в БД — только интерпретация по параметрам.
+     */
+    public boolean exportPreviewResultToExcel(TestResult result, String testName, String filePath) {
+        try (Workbook workbook = new HSSFWorkbook()) {
+            Map<String, CellStyle> styles = createStyles(workbook);
+
+            Sheet sheet = workbook.createSheet("Пробный запуск");
+            int rowNum = 0;
+
+            // Заголовок
+            Row titleRow = sheet.createRow(rowNum++);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("Результаты пробного запуска: " + testName);
+            titleCell.setCellStyle(styles.get("header"));
+            rowNum++;
+
+            // Метаданные
+            Row infoRow = sheet.createRow(rowNum++);
+            infoRow.createCell(0).setCellValue("Тест:");
+            infoRow.createCell(1).setCellValue(testName);
+
+            infoRow = sheet.createRow(rowNum++);
+            infoRow.createCell(0).setCellValue("Дата:");
+            infoRow.createCell(1).setCellValue(java.time.LocalDateTime.now().format(DATE_FORMATTER));
+
+            infoRow = sheet.createRow(rowNum++);
+            infoRow.createCell(0).setCellValue("⚠ Пробный запуск — результаты не сохранены в БД");
+
+            rowNum++;
+
+            // Шапка таблицы
+            String[] columns = {"Параметр", "Интерпретация"};
+            Row headerRow = sheet.createRow(rowNum++);
+            for (int i = 0; i < columns.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(columns[i]);
+                cell.setCellStyle(styles.get("header"));
+            }
+
+            // Данные
+            if (result.getInterpretations() != null) {
+                for (Map.Entry<String, String> entry : result.getInterpretations().entrySet()) {
+                    Row row = sheet.createRow(rowNum++);
+                    CellStyle normal = styles.get("normal");
+                    Cell c0 = row.createCell(0); c0.setCellValue(entry.getKey()); c0.setCellStyle(normal);
+                    Cell c1 = row.createCell(1); c1.setCellValue(entry.getValue() != null ? entry.getValue() : ""); c1.setCellStyle(normal);
+                }
+            }
+
+            try { sheet.autoSizeColumn(0); } catch (Exception ignored) {}
+            try { sheet.autoSizeColumn(1); } catch (Exception ignored) {}
+
+            try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
+                workbook.write(fileOut);
+            }
             return true;
 
         } catch (IOException e) {
@@ -140,6 +216,103 @@ public class ExcelReportService {
         styles.put("error", errorStyle);
 
         return styles;
+    }
+
+    private void createChartsSheet(Sheet sheet,
+                                   Map<String, Map<String, Integer>> statistics,
+                                   Map<String, Map<String, List<String>>> participants,
+                                   Workbook workbook,
+                                   Map<String, CellStyle> styles) {
+        int rowNum = 0;
+
+        Row titleRow = sheet.createRow(rowNum++);
+        Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue("Диаграммы распределения результатов");
+        titleCell.setCellStyle(styles.get("header"));
+        rowNum++;
+
+        Drawing<?> drawing  = sheet.createDrawingPatriarch();
+        CreationHelper helper = workbook.getCreationHelper();
+
+        for (Map.Entry<String, Map<String, Integer>> entry : statistics.entrySet()) {
+            String paramName = entry.getKey();
+            Map<String, Integer> paramStats = entry.getValue();
+            Map<String, List<String>> paramParticipants =
+                    (participants != null) ? participants.get(paramName) : null;
+
+            // Подпись параметра (колонки 0 и 9)
+            Row labelRow = sheet.createRow(rowNum);
+            Cell labelCell = labelRow.createCell(0);
+            labelCell.setCellValue(paramName);
+            labelCell.setCellStyle(styles.get("header"));
+            Cell listTitleCell = labelRow.createCell(9);
+            listTitleCell.setCellValue("Список участников по областям");
+            listTitleCell.setCellStyle(styles.get("header"));
+            rowNum++;
+
+            int imageStartRow = rowNum; // строка, с которой стартует изображение
+
+            // ── Рендерим диаграмму в PNG ───────────────────────────────────────
+            try {
+                BufferedImage img = PieChartRenderer.render(paramName, paramStats, 600, 400);
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ImageIO.write(img, "PNG", baos);
+                int picIdx = workbook.addPicture(baos.toByteArray(), Workbook.PICTURE_TYPE_PNG);
+
+                ClientAnchor anchor = helper.createClientAnchor();
+                anchor.setCol1(0);
+                anchor.setRow1(imageStartRow);
+                anchor.setCol2(8);
+                anchor.setRow2(imageStartRow + 22);
+                drawing.createPicture(anchor, picIdx);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            // ── Таблица участников правее диаграммы (столбцы J=9, K=10) ───────
+            int tableRow = imageStartRow;
+
+            // Шапка таблицы
+            Row colHeaderRow = getOrCreateRow(sheet, tableRow++);
+            Cell nameHdr = colHeaderRow.createCell(9);
+            nameHdr.setCellValue("Участник");
+            nameHdr.setCellStyle(styles.get("header"));
+            Cell areaHdr = colHeaderRow.createCell(10);
+            areaHdr.setCellValue("Область диаграммы");
+            areaHdr.setCellStyle(styles.get("header"));
+
+            // Данные — идём по меткам в том же порядке, что и на диаграмме
+            if (paramParticipants != null && !paramParticipants.isEmpty()) {
+                for (String label : paramStats.keySet()) {
+                    List<String> names = paramParticipants.get(label);
+                    if (names == null) continue;
+                    for (String name : names) {
+                        Row dataRow = getOrCreateRow(sheet, tableRow++);
+                        Cell nameCell = dataRow.createCell(9);
+                        nameCell.setCellValue(name);
+                        nameCell.setCellStyle(styles.get("normal"));
+                        Cell areaCell = dataRow.createCell(10);
+                        areaCell.setCellValue(label);
+                        areaCell.setCellStyle(styles.get("normal"));
+                    }
+                }
+            } else {
+                Row noDataRow = getOrCreateRow(sheet, tableRow);
+                noDataRow.createCell(9).setCellValue("Нет данных");
+            }
+
+            rowNum += 24; // высота изображения + отступ
+        }
+
+        // Авторазмер столбцов списка участников
+        try { sheet.autoSizeColumn(9);  } catch (Exception ignored) {}
+        try { sheet.autoSizeColumn(10); } catch (Exception ignored) {}
+    }
+
+    /** Возвращает существующую строку или создаёт новую, чтобы не затереть уже записанные ячейки */
+    private Row getOrCreateRow(Sheet sheet, int rowIndex) {
+        Row row = sheet.getRow(rowIndex);
+        return (row != null) ? row : sheet.createRow(rowIndex);
     }
 
     private void createSummarySheet(Sheet sheet, List<ResultService.TestResult> results,
@@ -270,8 +443,8 @@ public class ExcelReportService {
 
         rowNum++;
 
-        // Таблица параметров
-        String[] columns = {"Параметр", "Тип шкалы", "Сырой балл", "Итоговый балл", "Код", "Интерпретация"};
+        // Таблица параметров (без сырых баллов, только интерпретация и шкала)
+        String[] columns = {"Параметр", "Тип шкалы", "Область", "Интерпретация"};
         Row headerRow = sheet.createRow(rowNum++);
         for (int i = 0; i < columns.length; i++) {
             Cell cell = headerRow.createCell(i);
@@ -287,10 +460,8 @@ public class ExcelReportService {
 
                 Cell c0 = row.createCell(0); c0.setCellValue(pr.getParamName()); c0.setCellStyle(normal);
                 Cell c1 = row.createCell(1); c1.setCellValue(pr.getScaleType().equals("BINARY") ? "Бинарная" : "Диапазонная"); c1.setCellStyle(normal);
-                Cell c2 = row.createCell(2); c2.setCellValue(pr.getRawScore()); c2.setCellStyle(normal);
-                Cell c3 = row.createCell(3); c3.setCellValue(pr.getScaledScore()); c3.setCellStyle(normal);
-                Cell c4 = row.createCell(4); c4.setCellValue(pr.getInterpretedCode() != null ? pr.getInterpretedCode() : ""); c4.setCellStyle(normal);
-                Cell c5 = row.createCell(5); c5.setCellValue(pr.getInterpretationText()); c5.setCellStyle(normal);
+                Cell c2 = row.createCell(2); c2.setCellValue(pr.getInterpretedCode() != null ? pr.getInterpretedCode() : "—"); c2.setCellStyle(normal);
+                Cell c3 = row.createCell(3); c3.setCellValue(pr.getInterpretationText() != null ? pr.getInterpretationText() : ""); c3.setCellStyle(normal);
             }
         }
     }
@@ -375,19 +546,13 @@ public class ExcelReportService {
                 paramCell.setCellValue(pr.getParamName());
                 paramCell.setCellStyle(styles.get("header"));
 
-                rowNum++;
-
-                Row scoreRow = sheet.createRow(rowNum++);
-                scoreRow.createCell(0).setCellValue("Сырой балл: " + pr.getRawScore());
-                scoreRow.createCell(1).setCellValue("Итоговый балл: " + pr.getScaledScore());
-
                 if (pr.getInterpretedCode() != null && !pr.getInterpretedCode().isEmpty()) {
                     Row codeRow = sheet.createRow(rowNum++);
-                    codeRow.createCell(0).setCellValue("Код: " + pr.getInterpretedCode());
+                    codeRow.createCell(0).setCellValue("Область: " + pr.getInterpretedCode());
                 }
 
                 Row interpRow = sheet.createRow(rowNum++);
-                interpRow.createCell(0).setCellValue(pr.getInterpretationText());
+                interpRow.createCell(0).setCellValue(pr.getInterpretationText() != null ? pr.getInterpretationText() : "");
 
                 rowNum++; // Пустая строка между параметрами
             }
