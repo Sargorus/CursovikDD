@@ -31,21 +31,35 @@ public class TestSessionDAO {
 
     /**
      * Сохранить (или обновить) ответ пользователя.
-     * Использует UPSERT: если ответ на этот вопрос уже есть — обновляет его.
-     * Это позволяет корректно сохранять изменённый ответ при возврате назад.
+     * Использует DELETE + INSERT вместо ON CONFLICT, чтобы не зависеть
+     * от наличия UNIQUE-ограничения на (session_id, question_id).
+     * DELETE ничего не делает, если ответ ещё не был дан — всё безопасно.
      */
     public void saveAnswer(int sessionId, int questionId, int answerOptionId) throws SQLException {
-        String sql = "INSERT INTO user_answers (session_id, question_id, answer_option_id, answered_at) " +
-                "VALUES (?, ?, ?, CURRENT_TIMESTAMP) " +
-                "ON CONFLICT (session_id, question_id) " +
-                "DO UPDATE SET answer_option_id = EXCLUDED.answer_option_id, " +
-                "answered_at = CURRENT_TIMESTAMP";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, sessionId);
-            pstmt.setInt(2, questionId);
-            pstmt.setInt(3, answerOptionId);
-            pstmt.executeUpdate();
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // Удаляем старый ответ на этот вопрос (если есть)
+                try (PreparedStatement del = conn.prepareStatement(
+                        "DELETE FROM user_answers WHERE session_id = ? AND question_id = ?")) {
+                    del.setInt(1, sessionId);
+                    del.setInt(2, questionId);
+                    del.executeUpdate();
+                }
+                // Вставляем новый ответ
+                try (PreparedStatement ins = conn.prepareStatement(
+                        "INSERT INTO user_answers (session_id, question_id, answer_option_id, answered_at) " +
+                        "VALUES (?, ?, ?, CURRENT_TIMESTAMP)")) {
+                    ins.setInt(1, sessionId);
+                    ins.setInt(2, questionId);
+                    ins.setInt(3, answerOptionId);
+                    ins.executeUpdate();
+                }
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            }
         }
     }
 
