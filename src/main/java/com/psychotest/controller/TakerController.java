@@ -104,6 +104,8 @@ public class TakerController {
             sessionDAO.saveAnswer(sessionId, questionId, answerOptionId);
             return true;
         } catch (SQLException e) {
+            System.err.println("Ошибка сохранения ответа: session=" + sessionId
+                    + " question=" + questionId + " option=" + answerOptionId);
             e.printStackTrace();
             return false;
         }
