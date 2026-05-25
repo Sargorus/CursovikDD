@@ -214,6 +214,19 @@ public class TeacherController {
     }
 
     /**
+     * Удалить результат сессии (ответы, расчёты и саму сессию)
+     */
+    public boolean deleteResult(int sessionId) {
+        try {
+            sessionDAO.deleteSession(sessionId);
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
      * Получить детальные результаты сессии
      */
     public ResultService.SessionDetail getSessionDetail(int sessionId) {

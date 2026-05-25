@@ -77,6 +77,37 @@ public class TestSessionDAO {
     }
 
     /**
+     * Полностью удаляет сессию и все связанные данные:
+     * результаты по параметрам, ответы пользователя, саму запись сессии.
+     */
+    public void deleteSession(int sessionId) throws SQLException {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                try (PreparedStatement pstmt = conn.prepareStatement(
+                        "DELETE FROM test_results WHERE session_id = ?")) {
+                    pstmt.setInt(1, sessionId);
+                    pstmt.executeUpdate();
+                }
+                try (PreparedStatement pstmt = conn.prepareStatement(
+                        "DELETE FROM user_answers WHERE session_id = ?")) {
+                    pstmt.setInt(1, sessionId);
+                    pstmt.executeUpdate();
+                }
+                try (PreparedStatement pstmt = conn.prepareStatement(
+                        "DELETE FROM test_sessions WHERE id = ?")) {
+                    pstmt.setInt(1, sessionId);
+                    pstmt.executeUpdate();
+                }
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            }
+        }
+    }
+
+    /**
      * Прервать сессию
      */
     public void abandonSession(int sessionId) throws SQLException {
