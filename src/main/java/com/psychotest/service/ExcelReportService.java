@@ -2,8 +2,8 @@ package main.java.com.psychotest.service;
 
 import main.java.com.psychotest.model.Test;
 import main.java.com.psychotest.model.User;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -27,7 +27,7 @@ public class ExcelReportService {
     public boolean exportResultsToExcel(List<ResultService.TestResult> results,
                                         Test test,
                                         String filePath) {
-        try (Workbook workbook = new XSSFWorkbook()) {
+        try (Workbook workbook = new HSSFWorkbook()) {
 
             // Создаём стили
             Map<String, CellStyle> styles = createStyles(workbook);
@@ -66,7 +66,7 @@ public class ExcelReportService {
                                                String userName,
                                                String testName,
                                                String filePath) {
-        try (Workbook workbook = new XSSFWorkbook()) {
+        try (Workbook workbook = new HSSFWorkbook()) {
             Map<String, CellStyle> styles = createStyles(workbook);
 
             // Лист с результатами по шкалам
