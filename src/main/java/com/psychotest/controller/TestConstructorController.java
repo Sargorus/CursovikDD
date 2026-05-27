@@ -101,10 +101,17 @@ public class TestConstructorController {
     }
 
     public void addParameter(String name, String scaleType, List<ParameterInterpretation> interpretations) {
+        addParameter(name, scaleType, interpretations, null, null);
+    }
+
+    public void addParameter(String name, String scaleType, List<ParameterInterpretation> interpretations,
+                             Integer targetMinScore, Integer targetMaxScore) {
         Parameter param = new Parameter();
         param.setName(name);
         param.setScaleType(scaleType);
         param.setInterpretations(interpretations);
+        param.setTargetMinScore(targetMinScore);
+        param.setTargetMaxScore(targetMaxScore);
         testState.addParameter(param);
         notifyModelChanged();
     }
@@ -114,18 +121,31 @@ public class TestConstructorController {
      * Тип шкалы не меняется — он влияет на уже созданные влияния ответов.
      */
     public void updateParameter(int index, String name, List<ParameterInterpretation> interpretations) {
+        updateParameter(index, name, interpretations, null, null);
+    }
+
+    public void updateParameter(int index, String name, List<ParameterInterpretation> interpretations,
+                                Integer targetMinScore, Integer targetMaxScore) {
         Parameter param = testState.getParameters().get(index);
         param.setName(name);
         param.setInterpretations(interpretations);
+        param.setTargetMinScore(targetMinScore);
+        param.setTargetMaxScore(targetMaxScore);
         notifyModelChanged();
     }
 
     /**
-     * Обновляет вопрос по индексу — заменяет текст и все варианты ответов.
+     * Обновляет вопрос по индексу — заменяет текст, флаг обязательности и все варианты ответов.
      */
     public void updateQuestion(int index, String text, List<AnswerOptionData> answers) {
         Question q = testState.getQuestions().get(index);
+        updateQuestion(index, text, answers, q.isMandatory());
+    }
+
+    public void updateQuestion(int index, String text, List<AnswerOptionData> answers, boolean mandatory) {
+        Question q = testState.getQuestions().get(index);
         q.setText(text);
+        q.setMandatory(mandatory);
 
         List<AnswerOption> newOptions = new ArrayList<>();
         for (AnswerOptionData data : answers) {
@@ -184,9 +204,14 @@ public class TestConstructorController {
     }
 
     public void addQuestion(String text, List<AnswerOptionData> answers) {
+        addQuestion(text, answers, false);
+    }
+
+    public void addQuestion(String text, List<AnswerOptionData> answers, boolean mandatory) {
         Question question = new Question();
         question.setText(text);
         question.setOrderNum(testState.getQuestions().size());
+        question.setMandatory(mandatory);
 
         for (AnswerOptionData data : answers) {
             AnswerOption option = new AnswerOption();

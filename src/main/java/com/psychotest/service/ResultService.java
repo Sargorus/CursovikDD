@@ -327,6 +327,40 @@ public class ResultService {
     }
 
     /**
+     * Для каждого параметра возвращает список (ФИО, масштабированный балл) по всем
+     * завершённым сессиям теста. Используется для расчёта групповой статистики.
+     *
+     * @return paramName → [UserScore, ...]  (отсортировано по имени параметра, затем по баллу)
+     */
+    public Map<String, List<GroupReportAnalytics.UserScore>> getParameterScoresByUser(int testId)
+            throws SQLException {
+        Map<String, List<GroupReportAnalytics.UserScore>> result = new java.util.LinkedHashMap<>();
+
+        String sql =
+                "SELECT p.name AS param_name, u.full_name, tr.scaled_score " +
+                "FROM test_results tr " +
+                "JOIN test_sessions ts ON tr.session_id  = ts.id " +
+                "JOIN users          u  ON ts.user_id    = u.id " +
+                "JOIN parameters     p  ON tr.parameter_id = p.id " +
+                "WHERE ts.test_id = ? AND ts.status = 'COMPLETED' " +
+                "ORDER BY p.name, tr.scaled_score";
+
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, testId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                String paramName = rs.getString("param_name");
+                String fullName  = rs.getString("full_name");
+                int    score     = rs.getInt("scaled_score");
+                result.computeIfAbsent(paramName, k -> new java.util.ArrayList<>())
+                      .add(new GroupReportAnalytics.UserScore(fullName, score));
+            }
+        }
+        return result;
+    }
+
+    /**
      * Получить название теста по ID сессии
      */
     public String getTestNameBySessionId(int sessionId) throws SQLException {

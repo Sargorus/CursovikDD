@@ -8,9 +8,9 @@ import main.java.com.psychotest.model.*;
 import main.java.com.psychotest.service.TestPersistenceService;
 import main.java.com.psychotest.service.ResultService;
 import main.java.com.psychotest.service.ExcelReportService;
+import main.java.com.psychotest.service.GroupReportAnalytics;
 import main.java.com.psychotest.service.ResultCalculationService;
-import main.java.com.psychotest.util.DatabaseConnection;
-
+import main.java.com.psychotest.service.QuestionSelectionService;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -307,7 +307,23 @@ public class TeacherController {
     }
 
     /**
-     * Экспортирует результаты теста в Excel (включая диаграммы и список участников)
+     * Для каждого параметра возвращает список (ФИО, балл) по всем завершённым сессиям.
+     * Используется для расчёта групповой статистики в Excel-отчёте.
+     *
+     * @return paramName → [UserScore, ...]
+     */
+    public Map<String, List<GroupReportAnalytics.UserScore>> getParameterScoresByUser(int testId) {
+        try {
+            return resultService.getParameterScoresByUser(testId);
+        } catch (java.sql.SQLException e) {
+            e.printStackTrace();
+            return new java.util.LinkedHashMap<>();
+        }
+    }
+
+    /**
+     * Экспортирует результаты теста в Excel (включая диаграммы, список участников
+     * и лист групповой аналитики по параметрам)
      */
     public boolean exportTestResultsToExcel(int testId, String filePath) {
         Test test = getTestById(testId);
@@ -315,10 +331,11 @@ public class TeacherController {
             return false;
         }
 
-        List<ResultService.TestResult> results     = getResultsForTest(testId);
-        Map<String, Map<String, Integer>> statistics    = getTestStatistics(testId);
+        List<ResultService.TestResult> results           = getResultsForTest(testId);
+        Map<String, Map<String, Integer>> statistics     = getTestStatistics(testId);
         Map<String, Map<String, List<String>>> participants = getParticipantsByLabel(testId);
-        return excelService.exportResultsToExcel(results, test, statistics, participants, filePath);
+        Map<String, List<GroupReportAnalytics.UserScore>> paramScores = getParameterScoresByUser(testId);
+        return excelService.exportResultsToExcel(results, test, statistics, participants, paramScores, filePath);
     }
 
     /**
@@ -347,19 +364,11 @@ public class TeacherController {
     // Вспомогательный метод
     private int getTestIdBySessionId(int sessionId) {
         try {
-            String sql = "SELECT test_id FROM test_sessions WHERE id = ?";
-            try (java.sql.Connection conn = DatabaseConnection.getInstance().getConnection();
-                 java.sql.PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setInt(1, sessionId);
-                java.sql.ResultSet rs = pstmt.executeQuery();
-                if (rs.next()) {
-                    return rs.getInt(1);
-                }
-            }
-        } catch (java.sql.SQLException e) {
+            return sessionDAO.getTestIdBySessionId(sessionId);
+        } catch (SQLException e) {
             e.printStackTrace();
+            return -1;
         }
-        return -1;
     }
 
     /**
@@ -433,21 +442,24 @@ public class TeacherController {
     // ========== Пробный запуск теста (без сохранения в БД) ==========
 
     /**
-     * Загружает полный тест для пробного запуска преподавателем.
-     * Применяет лимит вопросов (если задан) — тот же алгоритм случайной выборки,
-     * что и при обычном прохождении.
+     * Загружает тест для пробного запуска преподавателем.
+     * Применяет умный отбор вопросов (если задан questionsPerSession),
+     * чтобы превью отражало реальную сессию.
      */
     public Test getFullTestForPreview(int testId) {
         try {
             Test test = testDAO.findById(testId);
             if (test != null) {
-                List<Question> questions = testDAO.loadQuestionsForTest(testId);
+                List<Question> allQuestions = testDAO.loadQuestionsForTest(testId);
                 int limit = test.getQuestionsPerSession();
-                if (limit > 0 && questions.size() > limit) {
-                    Collections.shuffle(questions);
-                    questions = questions.subList(0, limit);
+                List<Question> selected;
+                if (limit > 0 && allQuestions.size() > limit) {
+                    List<Parameter> parameters = testDAO.loadParameters(testId);
+                    selected = new QuestionSelectionService().select(allQuestions, parameters, limit);
+                } else {
+                    selected = allQuestions;
                 }
-                test.setQuestionBank(questions);
+                test.setQuestionBank(selected);
             }
             return test;
         } catch (SQLException e) {

@@ -10,6 +10,8 @@ public class Question implements Serializable {
     private int testId;
     private String text;
     private int orderNum;
+    /** true — вопрос всегда включается в сессию (обязательный) */
+    private boolean mandatory;
     private List<AnswerOption> answerOptions;
 
     public Question() {
@@ -34,6 +36,8 @@ public class Question implements Serializable {
     public void setTestId(int testId) { this.testId = testId; }
     public void setText(String text) { this.text = text; }
     public void setOrderNum(int orderNum) { this.orderNum = orderNum; }
+    public boolean isMandatory() { return mandatory; }
+    public void setMandatory(boolean mandatory) { this.mandatory = mandatory; }
     public void setAnswerOptions(List<AnswerOption> answerOptions) {
         this.answerOptions = answerOptions;
     }

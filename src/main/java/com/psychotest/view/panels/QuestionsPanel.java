@@ -35,16 +35,21 @@ public class QuestionsPanel extends JPanel {
         add(infoLabel, BorderLayout.NORTH);
 
         // Центральная панель - таблица вопросов
-        String[] columns = {"№", "Вопрос", "Ответов"};
+        String[] columns = {"★", "№", "Вопрос", "Ответов"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
+            public boolean isCellEditable(int row, int column) { return false; }
+            @Override
+            public Class<?> getColumnClass(int col) {
+                return col == 0 ? Boolean.class : super.getColumnClass(col);
             }
         };
 
         questionsTable = new JTable(tableModel);
         questionsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        questionsTable.getColumnModel().getColumn(0).setMaxWidth(30);  // ★
+        questionsTable.getColumnModel().getColumn(1).setMaxWidth(40);  // №
+        questionsTable.getColumnModel().getColumn(3).setMaxWidth(70);  // Ответов
         questionsTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 showAnswers();
@@ -99,6 +104,7 @@ public class QuestionsPanel extends JPanel {
         for (int i = 0; i < questions.size(); i++) {
             Question q = questions.get(i);
             tableModel.addRow(new Object[]{
+                    q.isMandatory(),
                     i + 1,
                     q.getText(),
                     q.getAnswerOptions().size()
@@ -114,8 +120,9 @@ public class QuestionsPanel extends JPanel {
             List<Parameter> params = controller.getParameters();
 
             StringBuilder sb = new StringBuilder();
-            sb.append("Вопрос: ").append(question.getText()).append("\n\n");
-            sb.append("Варианты ответов:\n");
+            sb.append("Вопрос: ").append(question.getText()).append("\n");
+            if (question.isMandatory()) sb.append("⭐ Обязательный вопрос\n");
+            sb.append("\nВарианты ответов:\n");
             sb.append("─".repeat(50)).append("\n");
 
             List<AnswerOption> options = question.getAnswerOptions();
@@ -148,7 +155,8 @@ public class QuestionsPanel extends JPanel {
                 controller.getParameters());
         dialog.setVisible(true);
         if (dialog.isSaved()) {
-            controller.addQuestion(dialog.getQuestionText(), dialog.getAnswers());
+            controller.addQuestion(dialog.getQuestionText(), dialog.getAnswers(),
+                    dialog.isMandatory());
         }
     }
 
@@ -162,7 +170,8 @@ public class QuestionsPanel extends JPanel {
                 controller.getQuestion(row));
         dialog.setVisible(true);
         if (dialog.isSaved()) {
-            controller.updateQuestion(row, dialog.getQuestionText(), dialog.getAnswers());
+            controller.updateQuestion(row, dialog.getQuestionText(), dialog.getAnswers(),
+                    dialog.isMandatory());
         }
     }
 

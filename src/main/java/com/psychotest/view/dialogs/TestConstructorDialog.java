@@ -3,6 +3,7 @@ package main.java.com.psychotest.view.dialogs;
 import main.java.com.psychotest.controller.TestConstructorController;
 import main.java.com.psychotest.model.TestState;
 import main.java.com.psychotest.service.TestDraftService;
+import main.java.com.psychotest.service.TestValidationService;
 import main.java.com.psychotest.view.panels.TestInfoPanel;
 import main.java.com.psychotest.view.panels.ParametersPanel;
 import main.java.com.psychotest.view.panels.QuestionsPanel;
@@ -237,11 +238,26 @@ public class TestConstructorDialog extends JDialog {
     }
 
     private void saveTest() {
-        if (!controller.validateTest().isValid()) {
-            JOptionPane.showMessageDialog(this,
-                    "Тест не готов к сохранению!\n\nПроверьте:\n• Название теста\n• Наличие параметров\n• Наличие вопросов",
-                    "Ошибка", JOptionPane.ERROR_MESSAGE);
+        TestValidationService.ValidationResult validation = controller.validateTest();
+
+        if (!validation.isValid()) {
+            String msg = "Тест не готов к сохранению!\n\n";
+            if (!validation.getErrors().isEmpty()) {
+                msg += "Ошибки:\n• " + String.join("\n• ", validation.getErrors());
+            }
+            JOptionPane.showMessageDialog(this, msg, "Ошибка валидации", JOptionPane.ERROR_MESSAGE);
             return;
+        }
+
+        // Показываем предупреждения банка вопросов (недостижимость целей, мёртвые вопросы)
+        if (!validation.getWarnings().isEmpty()) {
+            String warnMsg = "Обнаружены предупреждения:\n\n"
+                    + String.join("\n\n", validation.getWarnings())
+                    + "\n\nПродолжить сохранение?";
+            int proceed = JOptionPane.showConfirmDialog(this, warnMsg,
+                    "Предупреждения банка вопросов",
+                    JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (proceed != JOptionPane.YES_OPTION) return;
         }
 
         // ── Режим создания нового теста: простой вопрос ───────────────────────

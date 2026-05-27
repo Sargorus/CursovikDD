@@ -1,6 +1,8 @@
 package main.java.com.psychotest.view.panels;
 
 import main.java.com.psychotest.controller.TakerController;
+import main.java.com.psychotest.exception.BusinessException;
+import main.java.com.psychotest.exception.DatabaseException;
 import main.java.com.psychotest.model.Test;
 import main.java.com.psychotest.view.dialogs.TestTakingDialog;
 import javax.swing.*;
@@ -106,8 +108,8 @@ public class AvailableTestsPanel extends JPanel {
                 JOptionPane.YES_NO_OPTION);
 
         if (confirm == JOptionPane.YES_OPTION) {
-            int sessionId = controller.startTest(testId);
-            if (sessionId != -1) {
+            try {
+                int sessionId = controller.startTest(testId);
                 TestTakingDialog dialog = new TestTakingDialog(
                         SwingUtilities.getWindowAncestor(this),
                         controller,
@@ -118,9 +120,13 @@ public class AvailableTestsPanel extends JPanel {
                 dialog.setVisible(true);
                 // После закрытия диалога обновляем список
                 loadTests();
-            } else {
+            } catch (DatabaseException e) {
                 JOptionPane.showMessageDialog(this,
-                        "Ошибка при начале теста!",
+                        "Ошибка подключения к базе данных:\n" + e.getMessage(),
+                        "Ошибка БД", JOptionPane.ERROR_MESSAGE);
+            } catch (BusinessException e) {
+                JOptionPane.showMessageDialog(this,
+                        "Не удалось начать тест:\n" + e.getMessage(),
                         "Ошибка", JOptionPane.ERROR_MESSAGE);
             }
         }

@@ -22,6 +22,7 @@ public class QuestionEditorDialog extends JDialog {
     private final List<Parameter> params;
 
     private JTextArea questionField;
+    private JCheckBox mandatoryCheckbox;
     private JPanel answersContainer;   // содержит строки ответов (без заголовка)
     private JPanel answersWrapper;     // заголовок + answersContainer
 
@@ -30,6 +31,7 @@ public class QuestionEditorDialog extends JDialog {
 
     // Результат: null — пользователь отменил
     private String savedQuestionText;
+    private boolean savedMandatory;
     private List<TestConstructorController.AnswerOptionData> savedAnswers;
 
     /** Конструктор для добавления нового вопроса */
@@ -63,7 +65,7 @@ public class QuestionEditorDialog extends JDialog {
         root.add(buildButtonBar(), BorderLayout.SOUTH);
     }
 
-    /** Поле ввода текста вопроса */
+    /** Поле ввода текста вопроса + чекбокс «Обязательный» */
     private JPanel buildQuestionTextPanel(Question existing) {
         JPanel panel = new JPanel(new BorderLayout(5, 4));
         panel.add(new JLabel("Текст вопроса:"), BorderLayout.NORTH);
@@ -76,6 +78,13 @@ public class QuestionEditorDialog extends JDialog {
         JScrollPane sp = new JScrollPane(questionField);
         sp.setMinimumSize(new Dimension(0, 70));
         panel.add(sp, BorderLayout.CENTER);
+
+        mandatoryCheckbox = new JCheckBox(
+                "⭐ Обязательный вопрос (всегда включается в сессию)");
+        mandatoryCheckbox.setFont(mandatoryCheckbox.getFont().deriveFont(Font.PLAIN, 12f));
+        if (existing != null) mandatoryCheckbox.setSelected(existing.isMandatory());
+        panel.add(mandatoryCheckbox, BorderLayout.SOUTH);
+
         return panel;
     }
 
@@ -275,6 +284,7 @@ public class QuestionEditorDialog extends JDialog {
         }
 
         savedQuestionText = qText;
+        savedMandatory = mandatoryCheckbox.isSelected();
         savedAnswers = answers;
         dispose();
     }
@@ -288,9 +298,9 @@ public class QuestionEditorDialog extends JDialog {
         return savedAnswers != null;
     }
 
-    public String getQuestionText() {
-        return savedQuestionText;
-    }
+    public String getQuestionText() { return savedQuestionText; }
+
+    public boolean isMandatory() { return savedMandatory; }
 
     public List<TestConstructorController.AnswerOptionData> getAnswers() {
         return savedAnswers;

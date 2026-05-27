@@ -1,6 +1,8 @@
 package main.java.com.psychotest.view.dialogs;
 
 import main.java.com.psychotest.controller.TakerController;
+import main.java.com.psychotest.exception.BusinessException;
+import main.java.com.psychotest.exception.DatabaseException;
 import main.java.com.psychotest.model.*;
 import javax.swing.*;
 import java.awt.*;
@@ -37,12 +39,25 @@ public class TestTakingDialog extends JDialog {
         this.testName = testName;
         this.savedAnswers = new HashMap<>();
 
-        // Загружаем вопросы теста
-        Test test = controller.getFullTest(testId);
+        // Загружаем и отбираем вопросы для этой сессии (+ сохраняем выборку в БД)
+        Test test;
+        try {
+            test = controller.getFullTest(testId, sessionId);
+        } catch (DatabaseException e) {
+            JOptionPane.showMessageDialog(parent,
+                    "Ошибка подключения к БД при загрузке теста:\n" + e.getMessage(),
+                    "Ошибка БД", JOptionPane.ERROR_MESSAGE);
+            dispose();
+            return;
+        } catch (BusinessException e) {
+            JOptionPane.showMessageDialog(parent,
+                    "Тест недоступен:\n" + e.getMessage(),
+                    "Ошибка", JOptionPane.ERROR_MESSAGE);
+            dispose();
+            return;
+        }
 
-        if (test != null && test.getQuestionBank() != null && !test.getQuestionBank().isEmpty()) {
-            this.questions = test.getQuestionBank();
-        } else {
+        if (test.getQuestionBank() == null || test.getQuestionBank().isEmpty()) {
             this.questions = List.of();
             JOptionPane.showMessageDialog(parent,
                     "Тест не содержит вопросов!\nПожалуйста, сообщите преподавателю.",
@@ -50,6 +65,8 @@ public class TestTakingDialog extends JDialog {
             dispose();
             return;
         }
+
+        this.questions = test.getQuestionBank();
 
         // Загружаем ранее сохранённые ответы из БД
         loadSavedAnswers();
@@ -199,8 +216,14 @@ public class TestTakingDialog extends JDialog {
         for (int i = 0; i < options.size(); i++) {
             if (answerButtons[i].isSelected()) {
                 int answerOptionId = options.get(i).getId();
-                savedAnswers.put(question.getId(), answerOptionId);
-                controller.saveAnswer(sessionId, question.getId(), answerOptionId);
+                try {
+                    controller.saveAnswer(sessionId, question.getId(), answerOptionId);
+                    savedAnswers.put(question.getId(), answerOptionId);
+                } catch (DatabaseException e) {
+                    JOptionPane.showMessageDialog(this,
+                            "Ошибка сохранения ответа. Попробуйте ещё раз.\n" + e.getMessage(),
+                            "Ошибка БД", JOptionPane.WARNING_MESSAGE);
+                }
                 break;
             }
         }

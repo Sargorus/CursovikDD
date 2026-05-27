@@ -7,7 +7,11 @@ import main.java.com.psychotest.util.DatabaseConnection;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.LinkedHashSet;
 
 public class TestSessionDAO {
 
@@ -105,6 +109,79 @@ public class TestSessionDAO {
                 throw e;
             }
         }
+    }
+
+    /**
+     * Сохраняет список вопросов, выданных в данной сессии.
+     * Вызывается один раз при старте сессии после отбора вопросов.
+     */
+    public void saveSessionQuestions(int sessionId, List<Question> questions) throws SQLException {
+        String sql = "INSERT INTO session_questions (session_id, question_id, question_order) " +
+                     "VALUES (?, ?, ?) ON CONFLICT (session_id, question_id) DO NOTHING";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            int order = 0;
+            for (Question q : questions) {
+                pstmt.setInt(1, sessionId);
+                pstmt.setInt(2, q.getId());
+                pstmt.setInt(3, order++);
+                pstmt.addBatch();
+            }
+            pstmt.executeBatch();
+        }
+    }
+
+    /**
+     * Загружает ID вопросов, выданных в данной сессии, в порядке их показа.
+     * Возвращает пустой список, если записей нет (старые сессии до добавления функции).
+     */
+    public List<Integer> loadSessionQuestionIds(int sessionId) throws SQLException {
+        List<Integer> ids = new ArrayList<>();
+        String sql = "SELECT question_id FROM session_questions WHERE session_id = ? " +
+                     "ORDER BY question_order";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, sessionId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                ids.add(rs.getInt("question_id"));
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * Возвращает все ответы пользователя для данной сессии.
+     * Ключ — questionId, значение — answerOptionId.
+     */
+    public Map<Integer, Integer> getUserAnswers(int sessionId) throws SQLException {
+        Map<Integer, Integer> answers = new HashMap<>();
+        String sql = "SELECT question_id, answer_option_id FROM user_answers WHERE session_id = ?";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, sessionId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                answers.put(rs.getInt("question_id"), rs.getInt("answer_option_id"));
+            }
+        }
+        return answers;
+    }
+
+    /**
+     * Возвращает test_id для указанной сессии, или -1 если сессия не найдена.
+     */
+    public int getTestIdBySessionId(int sessionId) throws SQLException {
+        String sql = "SELECT test_id FROM test_sessions WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, sessionId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("test_id");
+            }
+        }
+        return -1;
     }
 
     /**

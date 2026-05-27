@@ -9,6 +9,7 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.JSeparator;
 
 public class ParametersPanel extends JPanel {
     private TestConstructorController controller;
@@ -131,11 +132,29 @@ public class ParametersPanel extends JPanel {
         JTextField nameField = new JTextField(15);
         JComboBox<String> typeCombo = new JComboBox<>(new String[]{"Бинарная (E/I)", "Диапазонная (0-100)"});
 
+        // Поля целевых значений для банка вопросов
+        JCheckBox enableTargets = new JCheckBox("Задать целевой диапазон для отбора вопросов");
+        JSpinner targetMinSpinner = new JSpinner(new SpinnerNumberModel(0, -9999, 9999, 1));
+        JSpinner targetMaxSpinner = new JSpinner(new SpinnerNumberModel(10, -9999, 9999, 1));
+        targetMinSpinner.setEnabled(false);
+        targetMaxSpinner.setEnabled(false);
+        enableTargets.addActionListener(ev -> {
+            boolean en = enableTargets.isSelected();
+            targetMinSpinner.setEnabled(en);
+            targetMaxSpinner.setEnabled(en);
+        });
+
         JPanel panel = new JPanel(new GridLayout(0, 2, 5, 5));
         panel.add(new JLabel("Название параметра:"));
         panel.add(nameField);
         panel.add(new JLabel("Тип шкалы:"));
         panel.add(typeCombo);
+        panel.add(new JSeparator(JSeparator.HORIZONTAL));
+        panel.add(enableTargets);
+        panel.add(new JLabel("<html><small>Мин. достижимый балл в сессии:</small></html>"));
+        panel.add(targetMinSpinner);
+        panel.add(new JLabel("<html><small>Макс. достижимый балл в сессии:</small></html>"));
+        panel.add(targetMaxSpinner);
 
         int result = JOptionPane.showConfirmDialog(this, panel, "Новый параметр", JOptionPane.OK_CANCEL_OPTION);
 
@@ -160,6 +179,16 @@ public class ParametersPanel extends JPanel {
             boolean isBinary = type.startsWith("Бинарная");
             String scaleType = isBinary ? "BINARY" : "RANGE";
 
+            Integer tMin = enableTargets.isSelected() ? (Integer) targetMinSpinner.getValue() : null;
+            Integer tMax = enableTargets.isSelected() ? (Integer) targetMaxSpinner.getValue() : null;
+
+            if (tMin != null && tMax != null && tMin > tMax) {
+                JOptionPane.showMessageDialog(this,
+                        "Целевой минимум не может быть больше максимума!",
+                        "Ошибка", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
             List<ParameterInterpretation> interpretations = new ArrayList<>();
 
             if (isBinary) {
@@ -169,7 +198,7 @@ public class ParametersPanel extends JPanel {
             }
 
             if (!interpretations.isEmpty()) {
-                controller.addParameter(name, scaleType, interpretations);
+                controller.addParameter(name, scaleType, interpretations, tMin, tMax);
             }
         }
     }
@@ -291,11 +320,31 @@ public class ParametersPanel extends JPanel {
         JLabel typeLabel = new JLabel(typeDisplay + "  (изменить нельзя)");
         typeLabel.setForeground(Color.GRAY);
 
+        boolean hadTargets = param.getTargetMinScore() != null || param.getTargetMaxScore() != null;
+        JCheckBox enableTargets = new JCheckBox("Целевой диапазон для отбора вопросов", hadTargets);
+        int curTMin = param.getTargetMinScore() != null ? param.getTargetMinScore() : 0;
+        int curTMax = param.getTargetMaxScore() != null ? param.getTargetMaxScore() : 10;
+        JSpinner targetMinSpinner = new JSpinner(new SpinnerNumberModel(curTMin, -9999, 9999, 1));
+        JSpinner targetMaxSpinner = new JSpinner(new SpinnerNumberModel(curTMax, -9999, 9999, 1));
+        targetMinSpinner.setEnabled(hadTargets);
+        targetMaxSpinner.setEnabled(hadTargets);
+        enableTargets.addActionListener(ev -> {
+            boolean en = enableTargets.isSelected();
+            targetMinSpinner.setEnabled(en);
+            targetMaxSpinner.setEnabled(en);
+        });
+
         JPanel namePanel = new JPanel(new GridLayout(0, 2, 5, 5));
         namePanel.add(new JLabel("Название параметра:"));
         namePanel.add(nameField);
         namePanel.add(new JLabel("Тип шкалы:"));
         namePanel.add(typeLabel);
+        namePanel.add(new JSeparator(JSeparator.HORIZONTAL));
+        namePanel.add(enableTargets);
+        namePanel.add(new JLabel("<html><small>Мин. достижимый балл в сессии:</small></html>"));
+        namePanel.add(targetMinSpinner);
+        namePanel.add(new JLabel("<html><small>Макс. достижимый балл в сессии:</small></html>"));
+        namePanel.add(targetMaxSpinner);
 
         int r = JOptionPane.showConfirmDialog(this, namePanel,
                 "Редактирование параметра", JOptionPane.OK_CANCEL_OPTION);
@@ -334,7 +383,17 @@ public class ParametersPanel extends JPanel {
             editRangeInterpretationsInPlace(newInterpretations);
         }
 
-        controller.updateParameter(row, name, newInterpretations);
+        Integer tMin = enableTargets.isSelected() ? (Integer) targetMinSpinner.getValue() : null;
+        Integer tMax = enableTargets.isSelected() ? (Integer) targetMaxSpinner.getValue() : null;
+
+        if (tMin != null && tMax != null && tMin > tMax) {
+            JOptionPane.showMessageDialog(this,
+                    "Целевой минимум не может быть больше максимума!",
+                    "Ошибка", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        controller.updateParameter(row, name, newInterpretations, tMin, tMax);
     }
 
     /** Возвращает новый список бинарных интерпретаций с предзаполнением, или null если отменено */

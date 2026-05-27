@@ -80,14 +80,24 @@ public class TestDAO {
     }
 
     private int saveParameter(Connection conn, int testId, Parameter param) throws SQLException {
-        String sql = "INSERT INTO parameters (test_id, name, scale_type, min_value, max_value) " +
-                "VALUES (?, ?, ?, ?, ?) RETURNING id";
+        String sql = "INSERT INTO parameters (test_id, name, scale_type, min_value, max_value, " +
+                "target_min_score, target_max_score) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id";
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, testId);
             pstmt.setString(2, param.getName());
             pstmt.setString(3, param.getScaleType());
             pstmt.setInt(4, param.getMinValue());
             pstmt.setInt(5, param.getMaxValue());
+            if (param.getTargetMinScore() != null) {
+                pstmt.setInt(6, param.getTargetMinScore());
+            } else {
+                pstmt.setNull(6, Types.INTEGER);
+            }
+            if (param.getTargetMaxScore() != null) {
+                pstmt.setInt(7, param.getTargetMaxScore());
+            } else {
+                pstmt.setNull(7, Types.INTEGER);
+            }
             ResultSet rs = pstmt.executeQuery();
             rs.next();
             int paramId = rs.getInt(1);
@@ -121,11 +131,13 @@ public class TestDAO {
     }
 
     private int saveQuestion(Connection conn, int testId, Question question) throws SQLException {
-        String sql = "INSERT INTO questions (test_id, text, order_num) VALUES (?, ?, ?) RETURNING id";
+        String sql = "INSERT INTO questions (test_id, text, order_num, is_mandatory) " +
+                     "VALUES (?, ?, ?, ?) RETURNING id";
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, testId);
             pstmt.setString(2, question.getText());
             pstmt.setInt(3, question.getOrderNum());
+            pstmt.setBoolean(4, question.isMandatory());
             ResultSet rs = pstmt.executeQuery();
             rs.next();
             return rs.getInt(1);
@@ -226,6 +238,11 @@ public class TestDAO {
                     param.setScaleType(rs.getString("scale_type"));
                     param.setMinValue(rs.getInt("min_value"));
                     param.setMaxValue(rs.getInt("max_value"));
+                    // Целевые диапазоны (могут быть NULL)
+                    Object tMin = rs.getObject("target_min_score");
+                    Object tMax = rs.getObject("target_max_score");
+                    param.setTargetMinScore(tMin != null ? rs.getInt("target_min_score") : null);
+                    param.setTargetMaxScore(tMax != null ? rs.getInt("target_max_score") : null);
 
                     // Загружаем интерпретации
                     param.setInterpretations(loadInterpretations(conn, param.getId(), param.getScaleType()));
@@ -246,6 +263,7 @@ public class TestDAO {
                     question.setTestId(rs.getInt("test_id"));
                     question.setText(rs.getString("text"));
                     question.setOrderNum(rs.getInt("order_num"));
+                    question.setMandatory(rs.getBoolean("is_mandatory"));
 
                     // Загружаем ответы
                     question.setAnswerOptions(loadAnswerOptions(conn, question.getId(), parameters));
@@ -651,6 +669,7 @@ public class TestDAO {
                 question.setTestId(rs.getInt("test_id"));
                 question.setText(rs.getString("text"));
                 question.setOrderNum(rs.getInt("order_num"));
+                question.setMandatory(rs.getBoolean("is_mandatory"));
 
                 // Загружаем ответы для вопроса
                 question.setAnswerOptions(loadAnswerOptionsForQuestion(question.getId()));
@@ -784,5 +803,34 @@ public class TestDAO {
             pstmt.setInt(2, userId);
             return pstmt.executeUpdate() > 0;
         }
+    }
+
+    /**
+     * Загружает параметры теста с их целевыми диапазонами.
+     * Используется алгоритмом отбора вопросов.
+     */
+    public List<Parameter> loadParameters(int testId) throws SQLException {
+        List<Parameter> parameters = new ArrayList<>();
+        String sql = "SELECT * FROM parameters WHERE test_id = ? ORDER BY id";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, testId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Parameter param = new Parameter();
+                param.setId(rs.getInt("id"));
+                param.setTestId(rs.getInt("test_id"));
+                param.setName(rs.getString("name"));
+                param.setScaleType(rs.getString("scale_type"));
+                param.setMinValue(rs.getInt("min_value"));
+                param.setMaxValue(rs.getInt("max_value"));
+                Object tMin = rs.getObject("target_min_score");
+                Object tMax = rs.getObject("target_max_score");
+                param.setTargetMinScore(tMin != null ? rs.getInt("target_min_score") : null);
+                param.setTargetMaxScore(tMax != null ? rs.getInt("target_max_score") : null);
+                parameters.add(param);
+            }
+        }
+        return parameters;
     }
 }

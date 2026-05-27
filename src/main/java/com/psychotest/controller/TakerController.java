@@ -3,16 +3,15 @@ package main.java.com.psychotest.controller;
 import main.java.com.psychotest.dao.TestDAO;
 import main.java.com.psychotest.dao.TestSessionDAO;
 import main.java.com.psychotest.dao.UserDAO;
+import main.java.com.psychotest.exception.DatabaseException;
+import main.java.com.psychotest.exception.EntityNotFoundException;
+import main.java.com.psychotest.exception.SessionException;
 import main.java.com.psychotest.model.*;
+import main.java.com.psychotest.service.QuestionSelectionService;
 import main.java.com.psychotest.service.ResultCalculationService;
-import main.java.com.psychotest.util.DatabaseConnection;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +23,7 @@ public class TakerController {
     private TestSessionDAO sessionDAO;
     private UserDAO userDAO;
     private ResultCalculationService resultService;
+    private QuestionSelectionService selectionService;
 
     public TakerController(int userId) {
         this.userId = userId;
@@ -31,6 +31,7 @@ public class TakerController {
         this.sessionDAO = new TestSessionDAO();
         this.userDAO = new UserDAO();
         this.resultService = new ResultCalculationService();
+        this.selectionService = new QuestionSelectionService();
     }
 
     // ========== Доступные тесты ==========
@@ -56,88 +57,137 @@ public class TakerController {
     }
 
     /**
-     * Получить полное состояние теста для прохождения.
-     * Если у теста задан лимит questionsPerSession > 0 и вопросов в банке больше,
-     * возвращает случайную выборку нужного размера.
+     * Загружает полный тест без отбора вопросов.
+     * Используется при расчёте результатов (сессия уже завершена).
+     *
+     * @throws EntityNotFoundException если тест с указанным ID не найден
+     * @throws DatabaseException       при ошибке обращения к БД
      */
     public Test getFullTest(int testId) {
         try {
             Test test = testDAO.findById(testId);
-            if (test != null) {
-                List<Question> questions = testDAO.loadQuestionsForTest(testId);
-
-                int limit = test.getQuestionsPerSession();
-                if (limit > 0 && questions.size() > limit) {
-                    // Случайная выборка без повторений
-                    Collections.shuffle(questions);
-                    questions = questions.subList(0, limit);
-                }
-
-                test.setQuestionBank(questions);
+            if (test == null) {
+                throw new EntityNotFoundException("Тест", testId);
             }
+            test.setQuestionBank(testDAO.loadQuestionsForTest(testId));
             return test;
         } catch (SQLException e) {
-            e.printStackTrace();
-            return null;
+            throw new DatabaseException("Ошибка загрузки теста #" + testId, e);
+        }
+    }
+
+    /**
+     * Отбирает вопросы из банка для новой сессии и сохраняет выборку в БД.
+     *
+     * <p>Алгоритм:
+     * <ol>
+     *   <li>Если у теста задан {@code questionsPerSession} меньше размера банка,
+     *       используется {@link QuestionSelectionService} — жадный отбор,
+     *       гарантирующий достижимость целевых значений по каждому параметру.</li>
+     *   <li>Иначе выдаются все вопросы банка.</li>
+     * </ol>
+     *
+     * @param testId    ID теста
+     * @param sessionId ID только что созданной сессии (для сохранения выборки)
+     * @return Test с заполненным questionBank
+     * @throws EntityNotFoundException если тест не найден
+     * @throws DatabaseException       при ошибке обращения к БД
+     */
+    public Test getFullTest(int testId, int sessionId) {
+        try {
+            Test test = testDAO.findById(testId);
+            if (test == null) {
+                throw new EntityNotFoundException("Тест", testId);
+            }
+
+            List<Question> allQuestions = testDAO.loadQuestionsForTest(testId);
+            List<Question> selected;
+
+            int limit = test.getQuestionsPerSession();
+            if (limit > 0 && allQuestions.size() > limit) {
+                // Умный отбор с учётом целевых диапазонов параметров
+                List<Parameter> parameters = testDAO.loadParameters(testId);
+                selected = selectionService.select(allQuestions, parameters, limit);
+            } else {
+                selected = new ArrayList<>(allQuestions);
+            }
+
+            // Сохраняем выданные вопросы для этой сессии
+            if (sessionId > 0 && !selected.isEmpty()) {
+                sessionDAO.saveSessionQuestions(sessionId, selected);
+            }
+
+            test.setQuestionBank(selected);
+            return test;
+        } catch (SQLException e) {
+            throw new DatabaseException("Ошибка загрузки теста #" + testId, e);
         }
     }
 
     // ========== Прохождение теста ==========
 
     /**
-     * Начать новую сессию тестирования
+     * Начать новую сессию тестирования.
+     *
+     * @return ID созданной сессии
+     * @throws SessionException  если сессию не удалось создать по неизвестной причине
+     * @throws DatabaseException при ошибке обращения к БД
      */
     public int startTest(int testId) {
         try {
-            return sessionDAO.createSession(userId, testId);
+            int sessionId = sessionDAO.createSession(userId, testId);
+            if (sessionId < 0) {
+                throw new SessionException("Не удалось создать сессию для теста #" + testId
+                        + ". Возможно, тест недоступен.");
+            }
+            return sessionId;
         } catch (SQLException e) {
-            e.printStackTrace();
-            return -1;
+            throw new DatabaseException("Ошибка при создании сессии тестирования", e);
         }
     }
 
     /**
-     * Сохранить ответ
+     * Сохранить ответ на вопрос.
+     *
+     * @throws DatabaseException при ошибке обращения к БД
      */
-    public boolean saveAnswer(int sessionId, int questionId, int answerOptionId) {
+    public void saveAnswer(int sessionId, int questionId, int answerOptionId) {
         try {
             sessionDAO.saveAnswer(sessionId, questionId, answerOptionId);
-            return true;
         } catch (SQLException e) {
-            System.err.println("Ошибка сохранения ответа: session=" + sessionId
-                    + " question=" + questionId + " option=" + answerOptionId);
-            e.printStackTrace();
-            return false;
+            throw new DatabaseException(
+                    "Ошибка сохранения ответа (сессия=" + sessionId
+                    + ", вопрос=" + questionId + ")", e);
         }
     }
 
     /**
-     * Завершить тест и получить результат
+     * Завершить тест и получить результат.
+     *
+     * @return рассчитанный результат
+     * @throws EntityNotFoundException если сессия или тест не найдены
+     * @throws DatabaseException       при ошибке обращения к БД
      */
     public TestResult calculateAndCompleteTest(int sessionId) {
         try {
             // Получаем сессию
             TestSession session = sessionDAO.getSession(sessionId);
-            if (session == null) return null;
+            if (session == null) {
+                throw new EntityNotFoundException("Сессия тестирования", sessionId);
+            }
 
-            // Получаем полный тест
+            // Получаем полный тест (getFullTest бросает EntityNotFoundException/DatabaseException)
             Test test = getFullTest(session.getTestId());
-            if (test == null) return null;
 
             // Рассчитываем результаты
             TestResult result = resultService.calculateResults(sessionId, test);
-            if (result == null) return null;
 
             // Завершаем сессию
             sessionDAO.completeSession(sessionId);
 
             return result;
         } catch (SQLException e) {
-            e.printStackTrace();
-            return null;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+            throw new DatabaseException("Ошибка при расчёте результатов сессии #" + sessionId, e);
         }
     }
 
@@ -211,22 +261,17 @@ public class TakerController {
     }
 
     /**
-     * Получить сохранённые ответы для сессии
+     * Получить сохранённые ответы для сессии.
+     * Возвращает пустую карту при ошибке (не критично — пользователь просто
+     * не увидит ранее выбранные ответы при возобновлении).
      */
     public Map<Integer, Integer> getSavedAnswers(int sessionId) {
-        Map<Integer, Integer> answers = new HashMap<>();
-        String sql = "SELECT question_id, answer_option_id FROM user_answers WHERE session_id = ?";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, sessionId);
-            ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                answers.put(rs.getInt("question_id"), rs.getInt("answer_option_id"));
-            }
+        try {
+            return sessionDAO.getUserAnswers(sessionId);
         } catch (SQLException e) {
             e.printStackTrace();
+            return new HashMap<>();
         }
-        return answers;
     }
 
 

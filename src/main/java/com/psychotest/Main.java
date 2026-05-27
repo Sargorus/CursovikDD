@@ -39,8 +39,11 @@ public class Main {
         System.out.println("PsychoTest v1.0 запуск...");
 
         // ── Шаг 1: Установка L&F до показа любых диалогов ──
+        // Metal L&F корректно отображает setBackground() на кнопках.
+        // Windows L&F игнорирует цвет фона кнопок, из-за чего белый текст
+        // сливается с белой/серой поверхностью кнопки.
         try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            UIManager.setLookAndFeel("javax.swing.plaf.metal.MetalLookAndFeel");
         } catch (Exception ignored) {}
 
         // ── Шаг 2: Загружаем конфигурацию БД ──

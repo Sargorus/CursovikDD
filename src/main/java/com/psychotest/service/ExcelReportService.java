@@ -4,6 +4,7 @@ import main.java.com.psychotest.model.Test;
 import main.java.com.psychotest.model.TestResult;
 import main.java.com.psychotest.model.User;
 import main.java.com.psychotest.util.PieChartRenderer;
+import java.util.stream.Collectors;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
 
@@ -23,12 +24,14 @@ public class ExcelReportService {
             DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
     /**
-     * Экспортирует результаты теста в Excel файл (с диаграммами и списком участников).
+     * Экспортирует результаты теста в Excel файл (с диаграммами, списком участников
+     * и листом групповой аналитики по параметрам).
      *
      * @param results      список результатов
      * @param test         тест
      * @param statistics   статистика интерпретаций: paramName → (метка → кол-во)
      * @param participants список участников по областям: paramName → (метка → [ФИО, ...])
+     * @param paramScores  баллы участников по параметрам: paramName → [UserScore, ...]
      * @param filePath     путь для сохранения
      * @return true если успешно
      */
@@ -36,6 +39,7 @@ public class ExcelReportService {
                                         Test test,
                                         Map<String, Map<String, Integer>> statistics,
                                         Map<String, Map<String, List<String>>> participants,
+                                        Map<String, List<GroupReportAnalytics.UserScore>> paramScores,
                                         String filePath) {
         try (Workbook workbook = new HSSFWorkbook()) {
 
@@ -46,6 +50,12 @@ public class ExcelReportService {
 
             Sheet detailsSheet = workbook.createSheet("Детальные результаты");
             createDetailsSheet(detailsSheet, results, test, styles);
+
+            // Лист аналитики группы (если есть баллы)
+            if (paramScores != null && !paramScores.isEmpty()) {
+                Sheet analyticsSheet = workbook.createSheet("Аналитика группы");
+                createGroupAnalyticsSheet(analyticsSheet, paramScores, styles);
+            }
 
             // Лист с диаграммами (если есть данные)
             if (statistics != null && !statistics.isEmpty()) {
@@ -167,6 +177,141 @@ public class ExcelReportService {
             e.printStackTrace();
             return false;
         }
+    }
+
+    private void createGroupAnalyticsSheet(Sheet sheet,
+                                            Map<String, List<GroupReportAnalytics.UserScore>> paramScores,
+                                            Map<String, CellStyle> styles) {
+        int rowNum = 0;
+
+        Row titleRow = sheet.createRow(rowNum++);
+        Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue("Аналитика группы по параметрам");
+        titleCell.setCellStyle(styles.get("header"));
+        rowNum++;
+
+        for (Map.Entry<String, List<GroupReportAnalytics.UserScore>> entry : paramScores.entrySet()) {
+            String paramName = entry.getKey();
+            List<GroupReportAnalytics.UserScore> scores = entry.getValue();
+
+            // Заголовок параметра
+            Row paramHeader = sheet.createRow(rowNum++);
+            Cell paramCell = paramHeader.createCell(0);
+            paramCell.setCellValue("Параметр: " + paramName);
+            paramCell.setCellStyle(styles.get("header"));
+
+            if (scores == null || scores.isEmpty()) {
+                Row noData = sheet.createRow(rowNum++);
+                noData.createCell(0).setCellValue("Нет данных");
+                rowNum++;
+                continue;
+            }
+
+            // Вычисляем статистику
+            List<GroupReportAnalytics.UserScore> maxHolders = GroupReportAnalytics.getMaxScoreHolders(scores);
+            List<GroupReportAnalytics.UserScore> minHolders = GroupReportAnalytics.getMinScoreHolders(scores);
+            double median = GroupReportAnalytics.getMedian(scores);
+            int    range  = GroupReportAnalytics.getRange(scores);
+            int    total  = scores.size();
+
+            String maxNames = maxHolders.stream()
+                    .map(GroupReportAnalytics.UserScore::getFullName)
+                    .collect(Collectors.joining(", "));
+            String minNames = minHolders.stream()
+                    .map(GroupReportAnalytics.UserScore::getFullName)
+                    .collect(Collectors.joining(", "));
+
+            // Краткая сводка
+            rowNum = addAnalyticsRow(sheet, rowNum, styles, "Участников", String.valueOf(total), null);
+            rowNum = addAnalyticsRow(sheet, rowNum, styles,
+                    "Максимальный балл",
+                    String.valueOf(maxHolders.get(0).getScore()),
+                    maxNames);
+            rowNum = addAnalyticsRow(sheet, rowNum, styles,
+                    "Минимальный балл",
+                    String.valueOf(minHolders.get(0).getScore()),
+                    minNames);
+            rowNum = addAnalyticsRow(sheet, rowNum, styles,
+                    "Медиана",
+                    String.format("%.2f", median), null);
+            rowNum = addAnalyticsRow(sheet, rowNum, styles,
+                    "Размах (макс − мин)",
+                    String.valueOf(range), null);
+            rowNum++;
+
+            // Список по убыванию (от большего к меньшему)
+            Row descHeader = sheet.createRow(rowNum++);
+            Cell descCell = descHeader.createCell(0);
+            descCell.setCellValue("По убыванию (от большего к меньшему)");
+            descCell.setCellStyle(styles.get("header"));
+
+            rowNum = addRankedListHeader(sheet, rowNum, styles);
+            List<GroupReportAnalytics.UserScore> descending = scores.stream()
+                    .sorted((a, b) -> Integer.compare(b.getScore(), a.getScore()))
+                    .collect(Collectors.toList());
+            for (int i = 0; i < descending.size(); i++) {
+                GroupReportAnalytics.UserScore us = descending.get(i);
+                rowNum = addRankedListRow(sheet, rowNum, styles, i + 1, us.getFullName(), us.getScore());
+            }
+            rowNum++;
+
+            // Список по возрастанию (от меньшего к большему)
+            Row ascHeader = sheet.createRow(rowNum++);
+            Cell ascCell = ascHeader.createCell(0);
+            ascCell.setCellValue("По возрастанию (от меньшего к большему)");
+            ascCell.setCellStyle(styles.get("header"));
+
+            rowNum = addRankedListHeader(sheet, rowNum, styles);
+            List<GroupReportAnalytics.UserScore> ascending = scores.stream()
+                    .sorted((a, b) -> Integer.compare(a.getScore(), b.getScore()))
+                    .collect(Collectors.toList());
+            for (int i = 0; i < ascending.size(); i++) {
+                GroupReportAnalytics.UserScore us = ascending.get(i);
+                rowNum = addRankedListRow(sheet, rowNum, styles, i + 1, us.getFullName(), us.getScore());
+            }
+
+            rowNum += 2; // отступ между параметрами
+        }
+
+        try { sheet.autoSizeColumn(0); } catch (Exception ignored) {}
+        try { sheet.autoSizeColumn(1); } catch (Exception ignored) {}
+        try { sheet.autoSizeColumn(2); } catch (Exception ignored) {}
+    }
+
+    /**
+     * Добавляет строку аналитики: метка | значение | [доп. инфо].
+     * Возвращает следующий номер строки.
+     */
+    private int addAnalyticsRow(Sheet sheet, int rowNum, Map<String, CellStyle> styles,
+                                 String label, String value, String extra) {
+        Row row = sheet.createRow(rowNum);
+        CellStyle normal = styles.get("normal");
+
+        Cell c0 = row.createCell(0); c0.setCellValue(label); c0.setCellStyle(normal);
+        Cell c1 = row.createCell(1); c1.setCellValue(value); c1.setCellStyle(normal);
+        if (extra != null && !extra.isEmpty()) {
+            Cell c2 = row.createCell(2); c2.setCellValue(extra); c2.setCellStyle(normal);
+        }
+        return rowNum + 1;
+    }
+
+    private int addRankedListHeader(Sheet sheet, int rowNum, Map<String, CellStyle> styles) {
+        Row row = sheet.createRow(rowNum);
+        CellStyle h = styles.get("header");
+        Cell c0 = row.createCell(0); c0.setCellValue("№");      c0.setCellStyle(h);
+        Cell c1 = row.createCell(1); c1.setCellValue("ФИО");    c1.setCellStyle(h);
+        Cell c2 = row.createCell(2); c2.setCellValue("Балл");   c2.setCellStyle(h);
+        return rowNum + 1;
+    }
+
+    private int addRankedListRow(Sheet sheet, int rowNum, Map<String, CellStyle> styles,
+                                  int rank, String fullName, int score) {
+        Row row = sheet.createRow(rowNum);
+        CellStyle normal = styles.get("normal");
+        Cell c0 = row.createCell(0); c0.setCellValue(rank);     c0.setCellStyle(normal);
+        Cell c1 = row.createCell(1); c1.setCellValue(fullName); c1.setCellStyle(normal);
+        Cell c2 = row.createCell(2); c2.setCellValue(score);    c2.setCellStyle(normal);
+        return rowNum + 1;
     }
 
     private Map<String, CellStyle> createStyles(Workbook workbook) {

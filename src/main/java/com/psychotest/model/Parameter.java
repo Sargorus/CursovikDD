@@ -12,6 +12,10 @@ public class Parameter implements Serializable {
     private String scaleType; // "BINARY" или "RANGE"
     private int minValue;
     private int maxValue;
+    /** Целевой минимум для алгоритма отбора вопросов; null = без ограничения */
+    private Integer targetMinScore;
+    /** Целевой максимум для алгоритма отбора вопросов; null = без ограничения */
+    private Integer targetMaxScore;
     private List<ParameterInterpretation> interpretations;
 
     public Parameter() {
@@ -40,6 +44,10 @@ public class Parameter implements Serializable {
     public void setScaleType(String scaleType) { this.scaleType = scaleType; }
     public void setMinValue(int minValue) { this.minValue = minValue; }
     public void setMaxValue(int maxValue) { this.maxValue = maxValue; }
+    public Integer getTargetMinScore() { return targetMinScore; }
+    public void setTargetMinScore(Integer targetMinScore) { this.targetMinScore = targetMinScore; }
+    public Integer getTargetMaxScore() { return targetMaxScore; }
+    public void setTargetMaxScore(Integer targetMaxScore) { this.targetMaxScore = targetMaxScore; }
     public void setInterpretations(List<ParameterInterpretation> interpretations) {
         this.interpretations = interpretations;
     }

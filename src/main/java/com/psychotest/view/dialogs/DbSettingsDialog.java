@@ -38,8 +38,14 @@ public class DbSettingsDialog extends JDialog {
         setSize(480, errorMessage != null ? 420 : 390);
         setLocationRelativeTo(parent);
         setResizable(false);
-        // Запрещаем закрытие по крестику — пользователь должен явно нажать "Выход"
+        // Закрытие по крестику = выход из приложения (как кнопка "Выход")
         setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                System.exit(0);
+            }
+        });
     }
 
     private void initComponents(DbConfig cfg, String errorMessage) {

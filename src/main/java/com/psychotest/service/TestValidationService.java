@@ -5,6 +5,7 @@ import main.java.com.psychotest.model.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class TestValidationService {
 
@@ -124,21 +125,43 @@ public class TestValidationService {
         if (state.getParameters().isEmpty()) {
             result.addError("Добавьте хотя бы один параметр (шкалу)");
         } else {
+            PossibleRanges calcRanges = state.getQuestions().isEmpty()
+                    ? null : calculatePossibleRanges(state);
+
             for (Parameter param : state.getParameters()) {
                 if (param.getInterpretations().isEmpty()) {
                     result.addError("У параметра '" + param.getName() + "' нет интерпретаций");
+                    continue;
                 }
 
-                // Проверка покрытия диапазонов
-                if (param.getScaleType().equals("RANGE") && !state.getQuestions().isEmpty()) {
-                    try {
-                        PossibleRanges ranges = calculatePossibleRanges(state);
-                        RangeInfo range = ranges.get(param.getName());
-                        if (range != null) {
-                            validateRangeCoverage(param, range.getMin(), range.getMax());
+                if (param.getScaleType().equals("RANGE")) {
+                    // Определяем ожидаемый диапазон для покрытия интерпретациями
+                    Integer tMin = param.getTargetMinScore();
+                    Integer tMax = param.getTargetMaxScore();
+
+                    if (tMin != null && tMax != null) {
+                        // Используем целевые значения как обязательный диапазон
+                        try { validateRangeCoverage(param, tMin, tMax); }
+                        catch (InvalidRangeException e) { result.addError(e.getMessage()); }
+
+                        // Проверяем, что ни одна интерпретация не выходит за пределы
+                        for (ParameterInterpretation interp : param.getInterpretations()) {
+                            if (interp.getRangeStart() != null && interp.getRangeStart() < tMin) {
+                                result.addError("Интерпретация параметра '" + param.getName()
+                                        + "' начинается ниже целевого минимума " + tMin);
+                            }
+                            if (interp.getRangeEnd() != null && interp.getRangeEnd() > tMax) {
+                                result.addError("Интерпретация параметра '" + param.getName()
+                                        + "' выходит за целевой максимум " + tMax);
+                            }
                         }
-                    } catch (InvalidRangeException e) {
-                        result.addError(e.getMessage());
+                    } else if (calcRanges != null) {
+                        // Fallback: проверяем по расчётному диапазону из вопросов
+                        RangeInfo range = calcRanges.get(param.getName());
+                        if (range != null) {
+                            try { validateRangeCoverage(param, range.getMin(), range.getMax()); }
+                            catch (InvalidRangeException e) { result.addError(e.getMessage()); }
+                        }
                     }
                 }
             }
@@ -166,7 +189,143 @@ public class TestValidationService {
         PossibleRanges ranges = calculatePossibleRanges(state);
         result.setRangeInfo(ranges);
 
+        // 5. Проверка банка вопросов (только если включён режим банка)
+        validateQuestionBank(state, result);
+
         return result;
+    }
+
+    /**
+     * Проверяет корректность банка вопросов:
+     * <ul>
+     *   <li>Слишком много обязательных вопросов (больше, чем questionsPerSession)</li>
+     *   <li>Недостаточно вопросов для сессии</li>
+     *   <li>Необязательные вопросы, которые никогда не попадут в сессию</li>
+     *   <li>Недостижимость целевых значений параметров при любом составе сессии</li>
+     * </ul>
+     */
+    public void validateQuestionBank(TestState state, ValidationResult result) {
+        int K = state.getQuestionsPerSession();
+        if (K <= 0 || state.getQuestions().isEmpty()) return; // режим банка не включён
+
+        List<Question> allQ = state.getQuestions();
+        List<Question> mandatory = allQ.stream()
+                .filter(Question::isMandatory).collect(Collectors.toList());
+        List<Question> optional = allQ.stream()
+                .filter(q -> !q.isMandatory()).collect(Collectors.toList());
+
+        int M = mandatory.size();
+        int N = optional.size();
+        int total = allQ.size();
+
+        // Ошибка: больше обязательных, чем мест в сессии
+        if (M > K) {
+            result.addError("Обязательных вопросов (" + M + ") больше, чем вопросов в сессии ("
+                    + K + "). Уменьшите количество обязательных или увеличьте размер сессии.");
+            return;
+        }
+
+        // Ошибка: недостаточно вопросов для сессии вообще
+        if (total < K) {
+            result.addError("В банке " + total + " вопросов, но сессия требует " + K
+                    + ". Добавьте ещё " + (K - total) + " вопрос(ов).");
+            return;
+        }
+
+        // Предупреждение: необязательные вопросы, которые никогда не попадут
+        if (M == K && N > 0) {
+            result.addWarning("⚠ " + N + " необязательных вопрос(ов) никогда не попадут в сессию: "
+                    + "обязательных вопросов ровно столько, сколько мест в сессии (" + K + ").");
+        } else if (M < K) {
+            // Необязательные вопросы, которые никогда не смогут попасть из-за математики
+            // Это возможно только если N > 0 и M + N >= K (уже проверили выше),
+            // но в будущем можно добавить проверку "вопросы заблокированные связями"
+        }
+
+        // Проверка достижимости целевых значений из доступного набора вопросов в сессии
+        checkTargetAchievability(state, mandatory, optional, K, result);
+    }
+
+    /**
+     * Проверяет, можно ли в принципе достичь целевых значений параметров
+     * при самом выгодном составе сессии (обязательные + лучшие необязательные).
+     */
+    private void checkTargetAchievability(TestState state,
+                                           List<Question> mandatory,
+                                           List<Question> optional,
+                                           int K, ValidationResult result) {
+        List<Parameter> params = state.getParameters();
+        int slots = K - mandatory.size(); // свободных слотов для необязательных
+
+        for (Parameter param : params) {
+            if (!"RANGE".equals(param.getScaleType())) continue;
+            Integer tMax = param.getTargetMaxScore();
+            Integer tMin = param.getTargetMinScore();
+            if (tMax == null && tMin == null) continue;
+
+            int paramIdx = params.indexOf(param);
+
+            // Вклад обязательных вопросов
+            int mandMaxSum = 0, mandMinSum = 0;
+            for (Question q : mandatory) {
+                int maxD = 0, minD = 0;
+                boolean found = false;
+                for (AnswerOption opt : q.getAnswerOptions()) {
+                    Integer delta = opt.getParameterImpacts().get(paramIdx);
+                    if (delta != null) {
+                        if (!found) { maxD = delta; minD = delta; found = true; }
+                        else { maxD = Math.max(maxD, delta); minD = Math.min(minD, delta); }
+                    }
+                }
+                mandMaxSum += maxD;
+                mandMinSum += minD;
+            }
+
+            // Выбираем лучшие необязательные для максимизации / минимизации
+            List<Integer> optMaxDeltas = new ArrayList<>();
+            List<Integer> optMinDeltas = new ArrayList<>();
+            for (Question q : optional) {
+                int maxD = 0, minD = 0;
+                boolean found = false;
+                for (AnswerOption opt : q.getAnswerOptions()) {
+                    Integer delta = opt.getParameterImpacts().get(paramIdx);
+                    if (delta != null) {
+                        if (!found) { maxD = delta; minD = delta; found = true; }
+                        else { maxD = Math.max(maxD, delta); minD = Math.min(minD, delta); }
+                    }
+                }
+                optMaxDeltas.add(maxD);
+                optMinDeltas.add(minD);
+            }
+
+            // Лучшие slots необязательных для максимума
+            if (tMax != null && slots > 0) {
+                List<Integer> sorted = optMaxDeltas.stream()
+                        .sorted((a, b) -> b - a).collect(Collectors.toList());
+                int bestOptMax = sorted.subList(0, Math.min(slots, sorted.size()))
+                        .stream().mapToInt(Integer::intValue).sum();
+                if (mandMaxSum + bestOptMax < tMax) {
+                    result.addWarning("⚠ Параметр '" + param.getName()
+                            + "': даже при самом выгодном составе сессии максимальный балл ("
+                            + (mandMaxSum + bestOptMax) + ") не достигает целевого максимума ("
+                            + tMax + "). Добавьте вопросы с большим влиянием или уменьшите цель.");
+                }
+            }
+
+            // Лучшие slots необязательных для минимума
+            if (tMin != null && slots > 0) {
+                List<Integer> sorted = optMinDeltas.stream()
+                        .sorted(Integer::compareTo).collect(Collectors.toList());
+                int bestOptMin = sorted.subList(0, Math.min(slots, sorted.size()))
+                        .stream().mapToInt(Integer::intValue).sum();
+                if (mandMinSum + bestOptMin > tMin) {
+                    result.addWarning("⚠ Параметр '" + param.getName()
+                            + "': даже при самом невыгодном составе сессии минимальный балл ("
+                            + (mandMinSum + bestOptMin) + ") не достигает целевого минимума ("
+                            + tMin + "). Добавьте вопросы с меньшим (отрицательным) влиянием.");
+                }
+            }
+        }
     }
 
     // Добавьте в конец файла TestValidationService.java, перед последней скобкой }

@@ -1,5 +1,6 @@
 package main.java.com.psychotest.service;
 
+import main.java.com.psychotest.dao.TestSessionDAO;
 import main.java.com.psychotest.model.*;
 import main.java.com.psychotest.util.DatabaseConnection;
 
@@ -25,9 +26,9 @@ public class ResultCalculationService {
             return result;
         }
 
-        // 2. Загружаем полную структуру теста
+        // 2. Загружаем структуру теста — только вопросы, которые были в этой сессии
         List<Parameter> parameters = loadParameters(test.getId());
-        List<Question> questions = loadQuestionsWithAnswers(test.getId());
+        List<Question> questions = loadSessionQuestionsWithAnswers(sessionId, test.getId());
 
         // 3. Создаём маппинг вопрос -> выбранный ответ
         Map<Integer, AnswerOption> selectedAnswers = new HashMap<>();
@@ -258,6 +259,41 @@ public class ResultCalculationService {
             }
         }
         return interpretations;
+    }
+
+    /**
+     * Загружает вопросы конкретной сессии (из session_questions).
+     * Если записей нет (старые сессии) — падает на полный список вопросов теста.
+     */
+    private List<Question> loadSessionQuestionsWithAnswers(int sessionId, int testId) throws SQLException {
+        // Пробуем загрузить вопросы, выданные в этой сессии
+        List<Integer> sessionQIds = new TestSessionDAO().loadSessionQuestionIds(sessionId);
+
+        if (!sessionQIds.isEmpty()) {
+            // Загружаем только вопросы сессии
+            List<Question> questions = new ArrayList<>();
+            for (int qId : sessionQIds) {
+                String sql = "SELECT * FROM questions WHERE id = ?";
+                try (Connection conn = DatabaseConnection.getInstance().getConnection();
+                     PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                    pstmt.setInt(1, qId);
+                    ResultSet rs = pstmt.executeQuery();
+                    if (rs.next()) {
+                        Question q = new Question();
+                        q.setId(rs.getInt("id"));
+                        q.setTestId(rs.getInt("test_id"));
+                        q.setText(rs.getString("text"));
+                        q.setOrderNum(rs.getInt("order_num"));
+                        q.setAnswerOptions(loadAnswerOptions(q.getId()));
+                        questions.add(q);
+                    }
+                }
+            }
+            return questions;
+        }
+
+        // Совместимость со старыми сессиями — загружаем все вопросы теста
+        return loadQuestionsWithAnswers(testId);
     }
 
     /**
