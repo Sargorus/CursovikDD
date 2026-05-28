@@ -298,8 +298,10 @@ public class TestValidationService {
                 optMinDeltas.add(minD);
             }
 
-            // Лучшие slots необязательных для максимума
-            if (tMax != null && slots > 0) {
+            // Лучшие slots необязательных для максимума.
+            // При slots == 0 (все места заняты обязательными) вклад необязательных = 0,
+            // проверка всё равно выполняется — иначе недостижимый максимум остаётся незамеченным.
+            if (tMax != null) {
                 List<Integer> sorted = optMaxDeltas.stream()
                         .sorted((a, b) -> b - a).collect(Collectors.toList());
                 int bestOptMax = sorted.subList(0, Math.min(slots, sorted.size()))
@@ -312,8 +314,9 @@ public class TestValidationService {
                 }
             }
 
-            // Лучшие slots необязательных для минимума
-            if (tMin != null && slots > 0) {
+            // Лучшие slots необязательных для минимума.
+            // При slots == 0 вклад необязательных = 0 — проверка обязательного набора сохраняется.
+            if (tMin != null) {
                 List<Integer> sorted = optMinDeltas.stream()
                         .sorted(Integer::compareTo).collect(Collectors.toList());
                 int bestOptMin = sorted.subList(0, Math.min(slots, sorted.size()))

@@ -240,6 +240,9 @@ public class TakerController {
                 return null;
             }
             Test test = testDAO.findById(session.getTestId());
+            if (test == null) {
+                return null; // тест был удалён — результат показать нельзя
+            }
             return resultService.calculateResults(sessionId, test);
         } catch (SQLException e) {
             e.printStackTrace();
